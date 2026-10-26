@@ -3,6 +3,22 @@ const { Op } = require('sequelize');
 const notificationService = require('../services/notificationService');
 const { getIo } = require('../config/socket');
 
+// The stored lat/lng is where the customer's pin/GPS was when ordering, which can differ from the
+// address they typed. Expose the typed address and a maps URL built from it so drivers navigate to it.
+function withNavigation(order) {
+  const json = typeof order.toJSON === 'function' ? order.toJSON() : order;
+  const delivery_address = [json.address_street, json.address_city, json.address_pincode]
+    .filter(Boolean)
+    .join(', ');
+  return {
+    ...json,
+    delivery_address,
+    navigation_url: delivery_address
+      ? `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${encodeURIComponent(delivery_address)}`
+      : null
+  };
+}
+
 class DriverController {
   /**
    * Get active orders for the logged-in driver
@@ -43,7 +59,7 @@ class DriverController {
         order: [['createdAt', 'ASC']]
       });
 
-      res.status(200).json(activeOrders);
+      res.status(200).json(activeOrders.map(withNavigation));
     } catch (error) {
       console.error('Get active orders error:', error.message);
       res.status(500).json({ error: 'Internal server error while fetching active orders.' });
@@ -89,7 +105,7 @@ class DriverController {
         order: [['updatedAt', 'DESC']]
       });
 
-      res.status(200).json(completedOrders);
+      res.status(200).json(completedOrders.map(withNavigation));
     } catch (error) {
       console.error('Get completed orders error:', error.message);
       res.status(500).json({ error: 'Internal server error while fetching completed orders.' });
@@ -139,7 +155,7 @@ class DriverController {
         return res.status(404).json({ error: 'Order not found' });
       }
 
-      res.status(200).json(order);
+      res.status(200).json(withNavigation(order));
     } catch (error) {
       console.error('Get order by id error:', error.message);
       res.status(500).json({ error: 'Internal server error while fetching order details.' });

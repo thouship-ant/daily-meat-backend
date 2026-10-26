@@ -341,7 +341,7 @@ exports.cancelOrder = async (req, res) => {
         userId: order.driver_id,
         title: 'Order Cancelled',
         body: `Order #${order.id} has been cancelled and removed from your route.`,
-        data: { route: 'driver_active_orders' },
+        data: { route: 'driver_active_orders', orderId: order.id, status: 'CANCELLED' },
         socketEvent: 'driverOrderStatusChanged'
       });
     }
