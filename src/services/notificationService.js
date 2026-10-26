@@ -58,6 +58,21 @@ class NotificationService {
   }
 
   /**
+   * Silently tell the customer's open app that an order's status changed (socket only, no push),
+   * so the order details / tracking screen can update without a manual refresh.
+   */
+  emitOrderStatus(order) {
+    try {
+      const io = getIo();
+      const payload = { data: { orderId: order.id, status: order.status } };
+      io.to(`user_${order.user_id}`).emit('orderStatusChanged', payload);
+      io.to(`order_${order.id}`).emit('orderStatusChanged', payload);
+    } catch (error) {
+      console.error('NotificationService.emitOrderStatus error:', error);
+    }
+  }
+
+  /**
    * Notify all Admins
    */
   async notifyAdmins({ title, body, data = {}, socketEvent }) {

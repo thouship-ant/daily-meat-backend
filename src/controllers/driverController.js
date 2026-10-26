@@ -1,11 +1,46 @@
-const { Order, User, OrderItem, Product, ProductVariant } = require('../models');
+const { Order, User, OrderItem, Product, ProductVariant, Address } = require('../models');
 const { Op } = require('sequelize');
 const notificationService = require('../services/notificationService');
 const { getIo } = require('../config/socket');
+const { geocodeAddress } = require('../services/geocodingService');
 
-// The stored lat/lng is where the customer's pin/GPS was when ordering, which can differ from the
-// address they typed. Expose the typed address and a maps URL built from it so drivers navigate to it.
-function withNavigation(order) {
+// The delivery pin is the one the customer set on the Add/Update Address screen. Make sure the
+// order carries it (repairing orders saved with a different pin), and only geocode the typed
+// address when no coordinates exist. Also expose the address text plus a maps URL.
+async function withNavigation(order) {
+  if (typeof order.save === 'function') {
+    const savedAddress = await Address.findOne({
+      where: {
+        user_id: order.user_id,
+        street: order.address_street,
+        city: order.address_city,
+        pincode: order.address_pincode
+      }
+    });
+
+    let pin = null;
+    if (savedAddress && savedAddress.latitude && savedAddress.longitude) {
+      pin = { latitude: savedAddress.latitude, longitude: savedAddress.longitude };
+    } else if (!order.address_latitude || !order.address_longitude) {
+      pin = await geocodeAddress({
+        street: order.address_street,
+        city: order.address_city,
+        pincode: order.address_pincode
+      });
+    }
+
+    if (pin) {
+      const changed =
+        Number(order.address_latitude).toFixed(6) !== Number(pin.latitude).toFixed(6) ||
+        Number(order.address_longitude).toFixed(6) !== Number(pin.longitude).toFixed(6);
+      if (changed) {
+        order.address_latitude = pin.latitude;
+        order.address_longitude = pin.longitude;
+        await order.save({ silent: true });
+      }
+    }
+  }
+
   const json = typeof order.toJSON === 'function' ? order.toJSON() : order;
   const delivery_address = [json.address_street, json.address_city, json.address_pincode]
     .filter(Boolean)
@@ -59,7 +94,9 @@ class DriverController {
         order: [['createdAt', 'ASC']]
       });
 
-      res.status(200).json(activeOrders.map(withNavigation));
+      const result = [];
+      for (const order of activeOrders) result.push(await withNavigation(order));
+      res.status(200).json(result);
     } catch (error) {
       console.error('Get active orders error:', error.message);
       res.status(500).json({ error: 'Internal server error while fetching active orders.' });
@@ -105,7 +142,12 @@ class DriverController {
         order: [['updatedAt', 'DESC']]
       });
 
-      res.status(200).json(completedOrders.map(withNavigation));
+      // History: no re-geocoding needed, just add the address fields
+      res.status(200).json(completedOrders.map((o) => {
+        const json = o.toJSON();
+        const delivery_address = [json.address_street, json.address_city, json.address_pincode].filter(Boolean).join(', ');
+        return { ...json, delivery_address };
+      }));
     } catch (error) {
       console.error('Get completed orders error:', error.message);
       res.status(500).json({ error: 'Internal server error while fetching completed orders.' });
@@ -155,7 +197,7 @@ class DriverController {
         return res.status(404).json({ error: 'Order not found' });
       }
 
-      res.status(200).json(withNavigation(order));
+      res.status(200).json(await withNavigation(order));
     } catch (error) {
       console.error('Get order by id error:', error.message);
       res.status(500).json({ error: 'Internal server error while fetching order details.' });
@@ -264,6 +306,7 @@ class DriverController {
 
       order.status = 'PICKED';
       await order.save();
+      notificationService.emitOrderStatus(order);
 
       res.status(200).json({ message: 'Order marked as picked successfully.', order });
     } catch (error) {
@@ -441,10 +484,16 @@ class DriverController {
         return res.status(400).json({ error: 'order_ids array is required.' });
       }
 
+      const toPick = await Order.findAll({
+        where: { id: order_ids, driver_id: driverId, status: 'ASSIGNED' }
+      });
+
       await Order.update(
         { status: 'PICKED' },
-        { where: { id: order_ids, driver_id: driverId, status: 'ASSIGNED' } }
+        { where: { id: toPick.map(o => o.id) } }
       );
+
+      toPick.forEach(o => notificationService.emitOrderStatus({ id: o.id, user_id: o.user_id, status: 'PICKED' }));
 
       res.status(200).json({ message: 'Orders marked as picked.' });
     } catch (error) {

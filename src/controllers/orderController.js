@@ -1,6 +1,7 @@
 const { Order, OrderItem, ProductVariant, sequelize } = require('../models');
 const paymentService = require('../services/paymentService');
 const { calculateDistance } = require('../utils/distanceCalc');
+const { geocodeAddress } = require('../services/geocodingService');
 const {
   createCouponRedemption,
   toMoney,
@@ -123,6 +124,27 @@ exports.placeOrder = async (req, res) => {
 
     const finalTotalAmount = toMoney(orderTotalBeforeDiscount - discountAmount);
 
+    // The pin the customer set on the Add/Update Address screen is the source of truth for the
+    // delivery location. Use it over whatever coordinates arrive with the order, and only
+    // geocode the typed address when no coordinates exist at all.
+    const { Address } = require('../models');
+    const savedAddress = await Address.findOne({
+      where: {
+        user_id: req.user.id,
+        street: address.street,
+        city: address.city,
+        pincode: address.pincode
+      },
+      transaction
+    });
+    const hasSavedPin = savedAddress && savedAddress.latitude && savedAddress.longitude;
+    const hasClientPin = address.latitude && address.longitude;
+    const pin = hasSavedPin
+      ? { latitude: savedAddress.latitude, longitude: savedAddress.longitude }
+      : hasClientPin
+        ? { latitude: address.latitude, longitude: address.longitude }
+        : await geocodeAddress(address);
+
     // Address snapshot
     const order = await Order.create({
       user_id: req.user.id,
@@ -140,8 +162,8 @@ exports.placeOrder = async (req, res) => {
       address_street: address.street,
       address_city: address.city,
       address_pincode: address.pincode,
-      address_latitude: address.latitude || null,
-      address_longitude: address.longitude || null,
+      address_latitude: pin?.latitude ?? null,
+      address_longitude: pin?.longitude ?? null,
       payment_method: paymentMethod || 'COD'
     }, { transaction });
 

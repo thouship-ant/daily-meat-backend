@@ -15,6 +15,13 @@ const { USER_ROLES } = require('../constants/enum');
 router.use(requireAuth);
 router.use(requireRole([USER_ROLES.DRIVER || 'DRIVER']));
 
+// Driver data changes live (cancellations, reassignments); never serve it from a cache or a 304
+router.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  req.headers['if-none-match'] = undefined;
+  next();
+});
+
 /**
  * @swagger
  * /api/driver/orders/active:

@@ -297,16 +297,21 @@ class AdminController {
         return res.status(404).json({ error: 'Driver not found or invalid role.' });
       }
 
+      const assignable = await Order.findAll({ where: { id: order_ids, status: 'CONFIRMED' } });
+
       await Order.update(
         { driver_id, status: 'ASSIGNED' },
-        { where: { id: order_ids, status: 'CONFIRMED' } }
+        { where: { id: assignable.map(o => o.id), status: 'CONFIRMED' } }
       );
+
+      // Let each customer's open order screen move to "Assigned to Rider"
+      assignable.forEach(o => notificationService.emitOrderStatus({ id: o.id, user_id: o.user_id, status: 'ASSIGNED' }));
 
       // Notify Driver
       await notificationService.notifyUser({
         userId: driver_id,
         title: 'New Delivery Assigned',
-        body: `You have been assigned to deliver ${order_ids.length} new order(s).`,
+        body: `You have been assigned to deliver ${assignable.length} new order(s).`,
         data: { route: 'driver_active_orders' },
         socketEvent: 'driverAssigned'
       });
@@ -417,6 +422,11 @@ class AdminController {
         order.failure_reason = null;
       }
       await order.save();
+
+      // Statuses with no customer notification below still update the open order screen live
+      if (['PENDING', 'ASSIGNED', 'PICKED'].includes(status)) {
+        notificationService.emitOrderStatus(order);
+      }
 
       // Notifications based on status
       if (status === 'CONFIRMED') {

@@ -1,4 +1,5 @@
 const { User, Order, OrderItem, sequelize } = require('../models');
+const { geocodeAddress } = require('../services/geocodingService');
 
 exports.createManualOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -42,6 +43,13 @@ exports.createManualOrder = async (req, res) => {
       // but let's just stick to the existing user record to be safe.
     }
 
+    // Prefer coordinates sent with the address (a pin set on the map); geocode the typed address
+    // only when there are none.
+    const hasPin = address.latitude && address.longitude;
+    const geocoded = hasPin ? null : await geocodeAddress(address);
+    const latitude = hasPin ? address.latitude : geocoded?.latitude ?? null;
+    const longitude = hasPin ? address.longitude : geocoded?.longitude ?? null;
+
     // 2. Create the Order
     const order = await Order.create({
       user_id: user.id,
@@ -56,8 +64,8 @@ exports.createManualOrder = async (req, res) => {
       address_street: address.street,
       address_city: address.city,
       address_pincode: address.pincode || 'N/A',
-      address_latitude: address.latitude || null,
-      address_longitude: address.longitude || null,
+      address_latitude: latitude,
+      address_longitude: longitude,
       payment_method: paymentMethod || 'PREPAID',
       status: 'CONFIRMED' // Manual orders can go straight to CONFIRMED
     }, { transaction });
@@ -80,8 +88,8 @@ exports.createManualOrder = async (req, res) => {
         street: address.street,
         city: address.city,
         pincode: address.pincode || '000000',
-        latitude: address.latitude || 0,
-        longitude: address.longitude || 0,
+        latitude: latitude || 0,
+        longitude: longitude || 0,
         is_deliverable: true
       }, { transaction });
     }
