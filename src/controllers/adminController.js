@@ -75,10 +75,8 @@ function getDateCondition(period, Op, startStr = null, endStr = null) {
   return {};
 }
 
-// Date condition for DELIVERED orders: matches on the actual completion time (delivered_at),
-// so orders booked on different days but delivered in the period are all counted.
-// Legacy delivered orders without delivered_at fall back to the booking/scheduled-date condition.
-function getDeliveredDateCondition(period, Op, startStr = null, endStr = null) {
+// IST-aligned [start, end) range for a dashboard period; end is null when open-ended. Null if unknown period.
+function getISTRange(period, startStr = null, endStr = null) {
   const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
   const istNow = new Date(Date.now() + IST_OFFSET_MS);
   // Start of an IST calendar day, expressed as a UTC instant
@@ -98,14 +96,41 @@ function getDeliveredDateCondition(period, Op, startStr = null, endStr = null) {
     start = istDayStart(sy, sm - 1, sd);
     end = istDayStart(ey, em - 1, ed + 1);
   } else {
-    return {};
+    return null;
   }
+  return { start, end };
+}
 
-  const deliveredAt = end ? { [Op.gte]: start, [Op.lt]: end } : { [Op.gte]: start };
+// Date condition for DELIVERED orders: matches on the actual completion time (delivered_at),
+// so orders booked on different days but delivered in the period are all counted.
+// Legacy delivered orders without delivered_at fall back to the booking/scheduled-date condition.
+function getDeliveredDateCondition(period, Op, startStr = null, endStr = null) {
+  const range = getISTRange(period, startStr, endStr);
+  if (!range) return {};
+
+  const deliveredAt = range.end ? { [Op.gte]: range.start, [Op.lt]: range.end } : { [Op.gte]: range.start };
   return {
     [Op.or]: [
       { delivered_at: deliveredAt },
       { [Op.and]: [{ delivered_at: null }, getDateCondition(period, Op, startStr, endStr)] }
+    ]
+  };
+}
+
+// Date condition for order lists: delivered orders match by delivery time, cancelled by booking time,
+// everything else by booking/scheduled date. Returns null when the period has no date filter.
+function getStatusAwareDateCondition(period, Op, startStr = null, endStr = null) {
+  const range = getISTRange(period, startStr, endStr);
+  if (!range) return null;
+
+  const created = range.end
+    ? { [Op.gte]: range.start, [Op.lt]: range.end }
+    : { [Op.gte]: range.start };
+  return {
+    [Op.or]: [
+      { [Op.and]: [{ status: 'DELIVERED' }, getDeliveredDateCondition(period, Op, startStr, endStr)] },
+      { status: 'CANCELLED', createdAt: created },
+      { [Op.and]: [{ status: { [Op.notIn]: ['DELIVERED', 'CANCELLED'] } }, getDateCondition(period, Op, startStr, endStr)] }
     ]
   };
 }
@@ -325,14 +350,15 @@ class AdminController {
       }
 
       // 2. Date Filter
+      let dateCondition = null;
       if (startDate && endDate) {
+        dateCondition = getStatusAwareDateCondition('custom', Op, startDate, endDate);
+      } else if (['today', 'week', 'month'].includes(date)) {
+        dateCondition = getStatusAwareDateCondition(date, Op);
+      }
+      if (dateCondition) {
         whereClause[Op.and] = whereClause[Op.and] || [];
-        whereClause[Op.and].push(getDateCondition('custom', Op, startDate, endDate));
-      } else if (date) {
-        if (['today', 'week', 'month'].includes(date)) {
-          whereClause[Op.and] = whereClause[Op.and] || [];
-          whereClause[Op.and].push(getDateCondition(date, Op));
-        }
+        whereClause[Op.and].push(dateCondition);
       }
 
       const orders = await Order.findAll({
@@ -851,8 +877,16 @@ class AdminController {
       const totalDrivers = await User.count({ where: { role: 'DRIVER' } });
 
       // 4. Recent Orders (Top 5, applying date filter if any)
+      // Delivered orders are shown by delivery time and cancelled ones by booking time,
+      // so an order delivered/cancelled on an earlier day isn't listed just because it was scheduled today.
+      const recentFilter = { ...paymentFilter };
+      const recentDate = getStatusAwareDateCondition(
+        filter, Op, req.query.start_date, req.query.end_date
+      );
+      if (recentDate) recentFilter[Op.and] = [recentDate];
+
       const recentOrders = await Order.findAll({
-        where: baseFilter,
+        where: recentFilter,
         limit: 5,
         order: [['createdAt', 'DESC']],
         include: [
