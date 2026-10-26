@@ -1,0 +1,108 @@
+const { Expo } = require('expo-server-sdk');
+const { getIo } = require('../config/socket');
+const { User } = require('../models');
+
+const expo = new Expo();
+
+class NotificationService {
+  /**
+   * Send a push notification and a socket event
+   * @param {Object} params
+   * @param {string} params.userId - The ID of the user to receive the notification
+   * @param {string} params.title - Notification title
+   * @param {string} params.body - Notification body
+   * @param {Object} params.data - Deep link data or extra payload
+   * @param {string} params.socketEvent - Socket event name to emit
+   */
+  async notifyUser({ userId, title, body, data = {}, socketEvent }) {
+    try {
+      // 1. Emit socket event if active
+      if (socketEvent) {
+        const io = getIo();
+        // Emit to user-specific room
+        io.to(`user_${userId}`).emit(socketEvent, { title, body, data });
+      }
+
+      // 2. Send Push Notification
+      const user = await User.findByPk(userId);
+      if (user && user.push_token) {
+        const tokens = user.push_token.split(',').map(t => t.trim());
+        const messages = [];
+
+        for (const token of tokens) {
+          if (Expo.isExpoPushToken(token)) {
+            messages.push({
+              to: token,
+              sound: 'default',
+              title: title,
+              body: body,
+              data: data,
+            });
+          }
+        }
+
+        if (messages.length > 0) {
+          const chunks = expo.chunkPushNotifications(messages);
+          for (let chunk of chunks) {
+            try {
+              await expo.sendPushNotificationsAsync(chunk);
+            } catch (error) {
+              console.error('Error sending push notification chunk:', error);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('NotificationService.notifyUser error:', error);
+    }
+  }
+
+  /**
+   * Notify all Admins
+   */
+  async notifyAdmins({ title, body, data = {}, socketEvent }) {
+    try {
+      // 1. Emit socket event if active
+      if (socketEvent) {
+        const io = getIo();
+        io.to('admin_room').emit(socketEvent, { title, body, data });
+      }
+
+      // 2. Send Push Notification
+      const admins = await User.findAll({ where: { role: 'ADMIN' } });
+      const messages = [];
+
+      for (let admin of admins) {
+        if (admin.push_token) {
+          const tokens = admin.push_token.split(',').map(t => t.trim());
+          for (const token of tokens) {
+            if (Expo.isExpoPushToken(token)) {
+              messages.push({
+                to: token,
+                sound: 'default',
+                title: title,
+                body: body,
+                data: data,
+              });
+            }
+          }
+        }
+      }
+
+      if (messages.length > 0) {
+        const chunks = expo.chunkPushNotifications(messages);
+        for (let chunk of chunks) {
+          try {
+            await expo.sendPushNotificationsAsync(chunk);
+          } catch (error) {
+            console.error('Error sending push notification to admins:', error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('NotificationService.notifyAdmins error:', error);
+    }
+  }
+}
+
+module.exports = new NotificationService();

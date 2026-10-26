@@ -1,0 +1,2965 @@
+{
+  "info": {
+    "_postman_id": "dailymeat-backend-complete-collection-v1",
+    "name": "Daily Meat - Backend API (Handover Collection)",
+    "description": "Comprehensive Postman API collection for Daily Meat Node.js + Express + PostgreSQL backend. Includes all Customer, Driver, and Admin endpoints with pre-configured Bearer tokens, environment variables, and auto-token test scripts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://dailymeatserver.devmetsolutions.com",
+      "type": "string"
+    },
+    {
+      "key": "localUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "activeUrl",
+      "value": "{{baseUrl}}",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "driverToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "addressId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "variantId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "couponId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "driverId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "ticketId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "billId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "contactId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "bannerId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "slotId",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01. Health & System",
+      "item": [
+        {
+          "name": "Server Root / Ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{activeUrl}}/",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                ""
+              ]
+            },
+            "description": "Check if the Express API server is awake and accepting HTTP connections."
+          }
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{activeUrl}}/api/health",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": "Returns server uptime, status, and database connectivity health."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Authentication & Profile",
+      "item": [
+        {
+          "name": "Check Phone / Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+919000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/check-phone",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "check-phone"
+              ]
+            },
+            "description": "Determines whether phone exists and returns role (CUSTOMER, DRIVER, ADMIN). Used on frontend to route between OTP or password."
+          }
+        },
+        {
+          "name": "Send OTP (SMS / Email)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+919000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/send-otp",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "send-otp"
+              ]
+            },
+            "description": "Dispatches 6-digit OTP via SMS Fortius (DLT template) or Zoho SMTP email. Note: '9000000000' is a pre-configured test account that always uses OTP '123456'."
+          }
+        },
+        {
+          "name": "Resend OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+919000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/resend-otp",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "resend-otp"
+              ]
+            },
+            "description": "Regenerates and re-transmits an OTP."
+          }
+        },
+        {
+          "name": "Verify OTP & Login (Customer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.tokens && res.tokens.accessToken) {",
+                  "    pm.collectionVariables.set('authToken', res.tokens.accessToken);",
+                  "    if (res.tokens.refreshToken) pm.collectionVariables.set('refreshToken', res.tokens.refreshToken);",
+                  "    console.log('Saved authToken & refreshToken to Collection Variables');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+919000000000\",\n  \"otp\": \"123456\",\n  \"deviceId\": \"postman-test-client\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/verify-otp",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-otp"
+              ]
+            },
+            "description": "Verifies 6-digit OTP. Returns User object and JWT access + refresh tokens. Test script automatically captures authToken into Postman collection variables!"
+          }
+        },
+        {
+          "name": "Login with Password (Admin / Driver)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.tokens && res.tokens.accessToken) {",
+                  "    if (res.user && res.user.role === 'ADMIN') {",
+                  "        pm.collectionVariables.set('adminToken', res.tokens.accessToken);",
+                  "    } else if (res.user && res.user.role === 'DRIVER') {",
+                  "        pm.collectionVariables.set('driverToken', res.tokens.accessToken);",
+                  "    }",
+                  "    pm.collectionVariables.set('authToken', res.tokens.accessToken);",
+                  "    console.log('Saved staff auth token to Collection Variables');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+919999999999\",\n  \"password\": \"AdminPassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/login-with-password",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login-with-password"
+              ]
+            },
+            "description": "Bcrypt password authentication for Store Staff (Admin & Delivery Drivers)."
+          }
+        },
+        {
+          "name": "Refresh Access Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/refresh-token",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh-token"
+              ]
+            },
+            "description": "Exchanges valid refresh token for brand new access token."
+          }
+        },
+        {
+          "name": "Get Current User Profile (/me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/me",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Returns profile details, push token status, and notification preferences."
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Azeem Freelance Dev\",\n  \"email\": \"developer@example.com\",\n  \"promotional_notifications\": true\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/profile",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "Updates user's name, email, and marks `is_profile_completed = true`."
+          }
+        },
+        {
+          "name": "Change Password (Staff)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oldPassword\": \"AdminPassword123\",\n  \"newPassword\": \"NewSecurePassword456\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/change-password",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "Updates bcrypt password for staff members."
+          }
+        },
+        {
+          "name": "Register Push Notification Token",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pushToken\": \"ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/push-token",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "push-token"
+              ]
+            },
+            "description": "Registers Expo or FCM push token for order tracking & promotion notifications."
+          }
+        },
+        {
+          "name": "Test Push Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/test-notification",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "test-notification"
+              ]
+            },
+            "description": "Dispatches a live test push alert to the logged-in user's device."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pushToken\": \"ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/logout",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Revokes refresh token in database and unbinds device push token."
+          }
+        },
+        {
+          "name": "Delete / Anonymize Account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/auth/profile",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "Anonymizes user PII, removes addresses and coupon links while keeping financial ledger consistency."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Customer Addresses",
+      "item": [
+        {
+          "name": "Get User Saved Addresses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/addresses",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "addresses"
+              ]
+            },
+            "description": "List all addresses saved by the logged-in customer."
+          }
+        },
+        {
+          "name": "Add Delivery Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Home\",\n  \"street\": \"Flat 402, Green Valley Apartments, Banjara Hills\",\n  \"city\": \"Hyderabad\",\n  \"pincode\": \"500034\",\n  \"latitude\": 17.4156,\n  \"longitude\": 78.4352\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/addresses",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "addresses"
+              ]
+            },
+            "description": "Validates delivery area and calculates Haversine distance from shop."
+          }
+        },
+        {
+          "name": "Update Address",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Office\",\n  \"street\": \"Tech Park, Hitec City\",\n  \"city\": \"Hyderabad\",\n  \"pincode\": \"500081\",\n  \"latitude\": 17.4474,\n  \"longitude\": 78.3762\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/addresses/{{addressId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "addresses",
+                "{{addressId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Set Address as Default",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/addresses/{{addressId}}/default",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "addresses",
+                "{{addressId}}",
+                "default"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Address",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/addresses/{{addressId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "addresses",
+                "{{addressId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Shop Settings",
+      "item": [
+        {
+          "name": "Get Shop Settings (Location & Radius)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{activeUrl}}/api/shop-settings",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "shop-settings"
+              ]
+            },
+            "description": "Public endpoint returning store coordinates, service radius, store timings, and deliverable pincodes."
+          }
+        },
+        {
+          "name": "Update Shop Settings (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shop_latitude\": 17.385044,\n  \"shop_longitude\": 78.486671,\n  \"delivery_radius_km\": 15,\n  \"store_start_time\": \"07:00\",\n  \"store_close_time\": \"22:00\",\n  \"is_store_open\": true,\n  \"deliverable_pincodes\": [\n    \"500001\",\n    \"500034\",\n    \"500081\",\n    \"500033\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/shop-settings",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "shop-settings"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Catalog - Public",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/categories",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "categories"
+              ]
+            },
+            "description": "Fetches Chicken, Mutton, Fish, Eggs, Combos, etc."
+          }
+        },
+        {
+          "name": "Get All Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/products",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "products"
+              ]
+            },
+            "description": "Returns active products with their cut variants, gross/net weights, and prices."
+          }
+        },
+        {
+          "name": "Get Products By Category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/products?category_id={{categoryId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "category_id",
+                  "value": "{{categoryId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Best Seller Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/products/best-sellers",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "products",
+                "best-sellers"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Single Product Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/products/{{productId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "products",
+                "{{productId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Variants",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/variants?page=1&limit=20",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "variants"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Active Promotional Banners",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/banners",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "banners"
+              ]
+            },
+            "description": "App home sliders and promotional graphics."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Catalog - Admin Management",
+      "item": [
+        {
+          "name": "Create Category (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Country Chicken",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Fresh country chicken cuts",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/categories",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "categories"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Category (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Country Chicken Special",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/categories/{{categoryId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "categories",
+                "{{categoryId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Category (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/categories/{{categoryId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "categories",
+                "{{categoryId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Product (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "category_id",
+                  "value": "{{categoryId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "name",
+                  "value": "Chicken Curry Cut",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Tender bone-in chicken curry cut pieces",
+                  "type": "text"
+                },
+                {
+                  "key": "is_active",
+                  "value": "true",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/products",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "products"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Product (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Chicken Curry Cut (Small)",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/products/{{productId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "products",
+                "{{productId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Product (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/products/{{productId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "products",
+                "{{productId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Variant / Cut (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{productId}}\",\n  \"weight\": \"500g\",\n  \"gross_weight\": \"650g\",\n  \"net_weight\": \"500g\",\n  \"price\": 180,\n  \"discounted_price\": 155,\n  \"cost_price\": 110,\n  \"in_stock\": true,\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/variants",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "variants"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Variant / Cut (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 190,\n  \"discounted_price\": 165,\n  \"in_stock\": true\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/variants/{{variantId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "variants",
+                "{{variantId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Variant (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/variants/{{variantId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "variants",
+                "{{variantId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Admin Banners List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/banners/admin",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "banners",
+                "admin"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Banner (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Weekend Flash Sale",
+                  "type": "text"
+                },
+                {
+                  "key": "link_url",
+                  "value": "dailymeat://category/chicken",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/banners",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "banners"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Toggle Banner Active Status (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/banners/{{bannerId}}/status",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "banners",
+                "{{bannerId}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Banner (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/catalog/banners/{{bannerId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "banners",
+                "{{bannerId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Orders & Delivery Slots",
+      "item": [
+        {
+          "name": "Get Active Delivery Slots",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{activeUrl}}/api/orders/slots",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "slots"
+              ]
+            },
+            "description": "Fetches active delivery slots sorted chronologically (e.g. 07:00 AM - 09:00 AM)."
+          }
+        },
+        {
+          "name": "Place Order (COD or Online)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"variantId\": 1,\n      \"productName\": \"Chicken Curry Cut\",\n      \"variantName\": \"500g\",\n      \"quantity\": 2,\n      \"instruction\": \"Please cut in medium curry pieces\"\n    }\n  ],\n  \"address\": {\n    \"title\": \"Home\",\n    \"street\": \"Road No 12, Banjara Hills\",\n    \"city\": \"Hyderabad\",\n    \"pincode\": \"500034\",\n    \"latitude\": 17.4156,\n    \"longitude\": 78.4352\n  },\n  \"paymentMethod\": \"COD\",\n  \"deliveryCharge\": 30,\n  \"deliveryDate\": \"2026-10-25\",\n  \"deliverySlotId\": 1,\n  \"deliverySlotLabel\": \"07:00 AM - 09:00 AM\",\n  \"deliveryInstruction\": \"Ring doorbell twice\",\n  \"couponCode\": \"WELCOME50\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/orders",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "description": "Creates an order inside a strict database transaction. If paymentMethod is ONLINE, initializes Cashfree session ID."
+          }
+        },
+        {
+          "name": "Get Customer Order History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/orders",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "description": "Lists past orders, line items, status progression, and assigned driver."
+          }
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/orders/{{orderId}}/cancel",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{orderId}}",
+                "cancel"
+              ]
+            },
+            "description": "Cancels order. If paid online, automatically calls Cashfree API to trigger instant refund."
+          }
+        },
+        {
+          "name": "Delete Draft / Unpaid Order",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/orders/{{orderId}}/draft",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{orderId}}",
+                "draft"
+              ]
+            },
+            "description": "Deletes an abandoned draft order if online checkout was cancelled before payment."
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. Coupons & Discounts",
+      "item": [
+        {
+          "name": "Get Available Coupons for User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/coupons/available",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "coupons",
+                "available"
+              ]
+            },
+            "description": "Lists active coupons eligible for the user based on redemptions & audience rules."
+          }
+        },
+        {
+          "name": "Validate Coupon against Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"couponCode\": \"WELCOME50\",\n  \"orderTotal\": 499\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/coupons/validate",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "coupons",
+                "validate"
+              ]
+            },
+            "description": "Evaluates coupon rules (min order, max discount cap, usage limits) and returns calculated savings."
+          }
+        }
+      ]
+    },
+    {
+      "name": "09. Payments (Cashfree)",
+      "item": [
+        {
+          "name": "Verify Payment (App Callback)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"{{orderId}}\",\n  \"cf_order_id\": \"cf_order_xxxxxxxxxxxx\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/payments/verify",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "verify"
+              ]
+            },
+            "description": "Called by Mobile App SDK immediately after Cashfree drop-in UI finishes. Validates signature with Cashfree server."
+          }
+        },
+        {
+          "name": "Cashfree Webhook (Server-to-Server)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"order\": {\n      \"order_id\": \"{{orderId}}\",\n      \"order_status\": \"PAID\",\n      \"order_amount\": 340\n    }\n  },\n  \"event_time\": \"2026-10-24T12:00:00Z\",\n  \"type\": \"PAYMENT_SUCCESS_WEBHOOK\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/payments/webhook",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "webhook"
+              ]
+            },
+            "description": "Public webhook receiver for Cashfree asynchronous payment confirmations."
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Driver Operations",
+      "item": [
+        {
+          "name": "Get Driver Active Deliveries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/driver/orders/active",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "driver",
+                "orders",
+                "active"
+              ]
+            },
+            "description": "Fetches ASSIGNED, PICKED, and OUT_FOR_DELIVERY orders assigned to this driver."
+          }
+        },
+        {
+          "name": "Get Driver Completed Deliveries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/driver/orders/completed",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "driver",
+                "orders",
+                "completed"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Driver Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/driver/dashboard/stats",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "driver",
+                "dashboard",
+                "stats"
+              ]
+            },
+            "description": "Returns today's deliveries count and 7-day performance graph data."
+          }
+        },
+        {
+          "name": "Get Driver Order Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/driver/orders/{{orderId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "driver",
+                "orders",
+                "{{orderId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark Order Picked",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/driver/orders/{{orderId}}/pick",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "driver",
+                "orders",
+                "{{orderId}}",
+                "pick"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark Order Out For Delivery",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/driver/orders/{{orderId}}/out-for-delivery",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "driver",
+                "orders",
+                "{{orderId}}",
+                "out-for-delivery"
+              ]
+            },
+            "description": "Triggers push notification to customer and notifies admin room."
+          }
+        },
+        {
+          "name": "Mark Order Delivered",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/driver/orders/{{orderId}}/deliver",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "driver",
+                "orders",
+                "{{orderId}}",
+                "deliver"
+              ]
+            },
+            "description": "Marks delivery complete. If paymentMethod is COD, automatically updates payment_status to PAID."
+          }
+        },
+        {
+          "name": "Mark Order Failed",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Customer phone unreachable and gate locked\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/driver/orders/{{orderId}}/fail",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "driver",
+                "orders",
+                "{{orderId}}",
+                "fail"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Bulk Mark Orders Picked",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_ids\": [\n    \"1\",\n    \"2\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/driver/orders/bulk/pick",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "driver",
+                "orders",
+                "bulk",
+                "pick"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Bulk Mark Orders Out For Delivery",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_ids\": [\n    \"1\",\n    \"2\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/driver/orders/bulk/out-for-delivery",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "driver",
+                "orders",
+                "bulk",
+                "out-for-delivery"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Driver GPS Location (HTTP Fallback)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderIds\": [\n    \"1\"\n  ],\n  \"latitude\": 17.4156,\n  \"longitude\": 78.4352,\n  \"speed\": 35.5,\n  \"heading\": 180\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/driver/location",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "driver",
+                "location"
+              ]
+            },
+            "description": "Broadcasts live GPS coordinates to Socket.IO order room if background task cannot keep direct WSS connection open."
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Admin Console",
+      "item": [
+        {
+          "name": "Dashboard Metrics (Today / Week / Month)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/dashboard?period=today",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "dashboard"
+              ],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "today"
+                }
+              ]
+            },
+            "description": "Total revenue, order count, pending deliveries, active drivers, and cost/profit breakdown."
+          }
+        },
+        {
+          "name": "Category-wise Sales Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/analysis/category-wise",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "analysis",
+                "category-wise"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Orders (Admin Filter)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/orders?page=1&limit=20&status=PENDING",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "PENDING"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Manual / Phone Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerPhone\": \"9876543210\",\n  \"customerName\": \"VIP Customer\",\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"variantId\": 1,\n      \"productName\": \"Chicken Biryani Cut\",\n      \"variantName\": \"1kg\",\n      \"quantity\": 1\n    }\n  ],\n  \"address\": {\n    \"title\": \"Office\",\n    \"street\": \"Road 10, Jubilee Hills\",\n    \"city\": \"Hyderabad\",\n    \"pincode\": \"500033\"\n  },\n  \"paymentMethod\": \"COD\",\n  \"totalAmount\": 280,\n  \"deliveryDate\": \"2026-10-25\",\n  \"deliverySlotId\": 1,\n  \"deliverySlotLabel\": \"07:00 AM - 09:00 AM\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/orders/manual",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "manual"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Order Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CONFIRMED\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/orders/{{orderId}}/status",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "{{orderId}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Driver Assignment Suggestions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/orders/{{orderId}}/assignment-suggestions",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "{{orderId}}",
+                "assignment-suggestions"
+              ]
+            },
+            "description": "Calculates driver distance from delivery address and lists eligible drivers."
+          }
+        },
+        {
+          "name": "Assign Driver to Order",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"{{orderId}}\",\n  \"driver_id\": \"{{driverId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/orders/assign-driver",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "assign-driver"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Driver Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ramesh Delivery Partner\",\n  \"phone\": \"+919876543211\",\n  \"email\": \"ramesh@example.com\",\n  \"password\": \"DriverPassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/drivers",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "drivers"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Drivers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/drivers",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "drivers"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Driver Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/drivers/{{driverId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "drivers",
+                "{{driverId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Toggle Driver Active Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/drivers/{{driverId}}/status",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "drivers",
+                "{{driverId}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List All Customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/customers?page=1&limit=20",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Customer by Phone",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/customers/search?phone=9876543210",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "customers",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "9876543210"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Customer Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/customers/{{customerId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "customers",
+                "{{customerId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Toggle Customer Active Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/customers/{{customerId}}/status",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "customers",
+                "{{customerId}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Export Customers CSV",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/customers/export",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "customers",
+                "export"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Delivery Slot",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"07:00 AM - 09:00 AM\",\n  \"start_time\": \"07:00\",\n  \"end_time\": \"09:00\",\n  \"max_capacity\": 50,\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/slots",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "slots"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Delivery Slots",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/slots",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "slots"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Delivery Slot",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"max_capacity\": 75,\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/slots/{{slotId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "slots",
+                "{{slotId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Delivery Slot",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/slots/{{slotId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "slots",
+                "{{slotId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Support Tickets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/tickets",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "tickets"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Support Ticket Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"RESOLVED\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/tickets/{{ticketId}}/status",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "tickets",
+                "{{ticketId}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Send Marketing Broadcast Push Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Sunday Special: 20% Off Fresh Mutton! 🍖\",\n  \"body\": \"Stock up for your Sunday biryani feast. Use code SUNDAY20 at checkout.\",\n  \"route\": \"category_mutton\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/marketing/send",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "marketing",
+                "send"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Coupon (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"FLAT100\",\n  \"title\": \"Flat ₹100 Off\",\n  \"description\": \"Save ₹100 on orders above ₹499\",\n  \"discount_type\": \"FLAT\",\n  \"discount_value\": 100,\n  \"min_order_amount\": 499,\n  \"total_redemption_limit\": 500,\n  \"per_user_limit\": 1,\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/coupons",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "coupons"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Admin Coupons",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/coupons",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "coupons"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Admin Coupon Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/coupons/{{couponId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "coupons",
+                "{{couponId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Admin Coupon",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"min_order_amount\": 599\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/coupons/{{couponId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "coupons",
+                "{{couponId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Toggle Admin Coupon Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/coupons/{{couponId}}/status",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "coupons",
+                "{{couponId}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Seller / Vendor Bill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seller_name\": \"Fresh Farm Poultry Supplies\",\n  \"bill_date\": \"2026-10-24\",\n  \"items\": [\n    {\n      \"product_id\": 1,\n      \"quantity_kg\": 50.5,\n      \"price_per_kg\": 110\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/seller-bills",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "seller-bills"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Seller Bills",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/seller-bills",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "seller-bills"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Required Items for Billing",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/seller-bills/required-items",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "seller-bills",
+                "required-items"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Seller Bill Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/admin/seller-bills/{{billId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "seller-bills",
+                "{{billId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Support & Help",
+      "item": [
+        {
+          "name": "Create Support Ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Inquiry about delivery slot timing\",\n  \"message\": \"Can my order be delivered exactly at 7:30 AM?\",\n  \"order_id\": \"{{orderId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/help",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "help"
+              ]
+            },
+            "description": "Creates ticket and alerts admins via WebSocket."
+          }
+        },
+        {
+          "name": "Get My Support Tickets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/help",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "help"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Contact Inquiries",
+      "item": [
+        {
+          "name": "Submit Contact Form (Public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Prospective Franchisee\",\n  \"email\": \"partner@example.com\",\n  \"phone\": \"+919876543210\",\n  \"message\": \"Interested in partnership or bulk supply for restaurant.\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/contact",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "contact"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Contacts (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/contact",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "contact"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Contact Status (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CONTACTED\"\n}"
+            },
+            "url": {
+              "raw": "{{activeUrl}}/api/contact/{{contactId}}/status",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "contact",
+                "{{contactId}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Contact Inquiry (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{activeUrl}}/api/contact/{{contactId}}",
+              "host": [
+                "{{activeUrl}}"
+              ],
+              "path": [
+                "api",
+                "contact",
+                "{{contactId}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
