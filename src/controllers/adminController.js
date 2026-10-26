@@ -75,6 +75,41 @@ function getDateCondition(period, Op, startStr = null, endStr = null) {
   return {};
 }
 
+// Date condition for DELIVERED orders: matches on the actual completion time (delivered_at),
+// so orders booked on different days but delivered in the period are all counted.
+// Legacy delivered orders without delivered_at fall back to the booking/scheduled-date condition.
+function getDeliveredDateCondition(period, Op, startStr = null, endStr = null) {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const istNow = new Date(Date.now() + IST_OFFSET_MS);
+  // Start of an IST calendar day, expressed as a UTC instant
+  const istDayStart = (y, m, d) => new Date(Date.UTC(y, m, d) - IST_OFFSET_MS);
+
+  let start;
+  let end = null;
+  if (period === 'today') {
+    start = istDayStart(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate());
+  } else if (period === 'week') {
+    start = istDayStart(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate() - istNow.getUTCDay());
+  } else if (period === 'month') {
+    start = istDayStart(istNow.getUTCFullYear(), istNow.getUTCMonth(), 1);
+  } else if (period === 'custom' && startStr && endStr) {
+    const [sy, sm, sd] = startStr.split('-').map(Number);
+    const [ey, em, ed] = endStr.split('-').map(Number);
+    start = istDayStart(sy, sm - 1, sd);
+    end = istDayStart(ey, em - 1, ed + 1);
+  } else {
+    return {};
+  }
+
+  const deliveredAt = end ? { [Op.gte]: start, [Op.lt]: end } : { [Op.gte]: start };
+  return {
+    [Op.or]: [
+      { delivered_at: deliveredAt },
+      { [Op.and]: [{ delivered_at: null }, getDateCondition(period, Op, startStr, endStr)] }
+    ]
+  };
+}
+
 class AdminController {
   /**
    * Create a new driver account
@@ -781,9 +816,18 @@ class AdminController {
         baseFilter[Op.and].push(getDateCondition('custom', Op, req.query.start_date, req.query.end_date));
       }
 
+      // Delivered orders are bucketed by when they were delivered, not when they were booked
+      const paymentFilter = { [Op.or]: baseFilter[Op.or] };
+      const deliveredFilter = { ...paymentFilter };
+      if (['today', 'week', 'month'].includes(filter)) {
+        deliveredFilter[Op.and] = [getDeliveredDateCondition(filter, Op)];
+      } else if (filter === 'custom' && req.query.start_date && req.query.end_date) {
+        deliveredFilter[Op.and] = [getDeliveredDateCondition('custom', Op, req.query.start_date, req.query.end_date)];
+      }
+
       // 1. Total Revenue (Only from DELIVERED orders)
       const deliveredOrders = await Order.findAll({
-        where: { status: 'DELIVERED', ...baseFilter },
+        where: { status: 'DELIVERED', ...deliveredFilter },
         attributes: ['total_amount', 'total_profit', 'delivery_charge']
       });
       const grossSales = deliveredOrders.reduce((sum, order) => sum + (parseFloat(order.total_amount) || 0), 0);
@@ -799,7 +843,7 @@ class AdminController {
         where: { status: { [Op.in]: ['ASSIGNED', 'PICKED', 'OUT_FOR_DELIVERY'] }, ...baseFilter }
       });
       const completedDeliveriesCount = await Order.count({
-        where: { status: 'DELIVERED', ...baseFilter }
+        where: { status: 'DELIVERED', ...deliveredFilter }
       });
 
       // 3. User Counts (All-time, generally not filtered by date on overview)
