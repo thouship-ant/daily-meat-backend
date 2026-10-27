@@ -19,6 +19,11 @@ const requireAuth = async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized: User not found' });
     }
 
+    // Reject tokens issued before a forced logout of all devices
+    if (user.tokens_valid_after && decoded.iat < Math.floor(user.tokens_valid_after.getTime() / 1000)) {
+      return res.status(401).json({ error: 'Unauthorized: Session ended. Please log in again.' });
+    }
+
     // Attach user object to the request
     req.user = user;
     next();

@@ -46,6 +46,11 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  tokens_valid_after: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'Access tokens issued before this time are rejected (used to force logout on all devices)'
+  },
   push_token: {
     type: DataTypes.STRING,
     allowNull: true,

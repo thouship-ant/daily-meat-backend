@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.js",
     "db:sync": "node src/scripts/syncDb.js",
     "setup:admin": "node src/scripts/setupAdmin.js",
+    "logout:admins": "node src/scripts/logoutAdmins.js",
     "test:s3": "node src/scripts/testS3.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

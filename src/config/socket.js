@@ -31,6 +31,10 @@ const initSocket = (server) => {
         return next(new Error('Authentication error: User not found'));
       }
 
+      if (user.tokens_valid_after && decoded.iat < Math.floor(user.tokens_valid_after.getTime() / 1000)) {
+        return next(new Error('Authentication error: Session ended'));
+      }
+
       // Attach verified user to the socket for use in event handlers
       socket.user = user;
       next();
