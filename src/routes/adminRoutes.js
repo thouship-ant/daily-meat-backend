@@ -41,6 +41,20 @@ router.get('/dashboard', adminController.getDashboardStats);
 
 /**
  * @swagger
+ * /api/admin/logout-all-admins:
+ *   post:
+ *     summary: Log every admin out of all devices (including the caller)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: All admin sessions ended
+ */
+router.post('/logout-all-admins', adminController.logoutAllAdmins);
+
+/**
+ * @swagger
  * /api/admin/analysis/category-wise:
  *   get:
  *     summary: Get sales revenue analysis grouped by category

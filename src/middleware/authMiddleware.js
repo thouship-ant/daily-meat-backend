@@ -21,7 +21,7 @@ const requireAuth = async (req, res, next) => {
 
     // Reject tokens issued before a forced logout of all devices
     if (user.tokens_valid_after && decoded.iat < Math.floor(user.tokens_valid_after.getTime() / 1000)) {
-      return res.status(401).json({ error: 'Unauthorized: Session ended. Please log in again.' });
+      return res.status(401).json({ error: 'Unauthorized: Session ended. Please log in again.', code: 'SESSION_ENDED' });
     }
 
     // Attach user object to the request

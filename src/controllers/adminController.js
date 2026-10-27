@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const bcrypt = require('bcrypt');
 const { USER_ROLES } = require('../constants/enum');
 const notificationService = require('../services/notificationService');
+const { getIo } = require('../config/socket');
 const { parse } = require('json2csv');
 
 // Haversine formula to calculate distance between two coordinates in km
@@ -481,6 +482,29 @@ class AdminController {
       res.status(500).json({ error: 'Internal server error while updating order status.' });
     }
   }
+  /**
+   * Log every ADMIN out of all devices (including the caller)
+   * POST /admin/logout-all-admins
+   */
+  async logoutAllAdmins(req, res) {
+    try {
+      const [affected] = await User.update(
+        { tokens_valid_after: new Date(), refresh_token: null, push_token: null },
+        { where: { role: 'ADMIN' } }
+      );
+
+      // Tell open admin apps to go to login, then drop their socket connections
+      const io = getIo();
+      io.to('admin_room').emit('forceLogout', { code: 'SESSION_ENDED', message: 'You have been logged out from all devices.' });
+      io.in('admin_room').disconnectSockets(true);
+
+      res.status(200).json({ message: `Logged out ${affected} admin account(s) from all devices.` });
+    } catch (error) {
+      console.error('Logout all admins error:', error.message);
+      res.status(500).json({ error: 'Internal server error while logging out admins.' });
+    }
+  }
+
   /**
    * Get all drivers with analytics
    * GET /admin/drivers
