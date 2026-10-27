@@ -5,6 +5,7 @@ const { USER_ROLES } = require('../constants/enum');
 const notificationService = require('../services/notificationService');
 const { getIo } = require('../config/socket');
 const { parse } = require('json2csv');
+const { getISTRange } = require('../utils/istRange');
 
 // Haversine formula to calculate distance between two coordinates in km
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -74,32 +75,6 @@ function getDateCondition(period, Op, startStr = null, endStr = null) {
     };
   }
   return {};
-}
-
-// IST-aligned [start, end) range for a dashboard period; end is null when open-ended. Null if unknown period.
-function getISTRange(period, startStr = null, endStr = null) {
-  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-  const istNow = new Date(Date.now() + IST_OFFSET_MS);
-  // Start of an IST calendar day, expressed as a UTC instant
-  const istDayStart = (y, m, d) => new Date(Date.UTC(y, m, d) - IST_OFFSET_MS);
-
-  let start;
-  let end = null;
-  if (period === 'today') {
-    start = istDayStart(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate());
-  } else if (period === 'week') {
-    start = istDayStart(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate() - istNow.getUTCDay());
-  } else if (period === 'month') {
-    start = istDayStart(istNow.getUTCFullYear(), istNow.getUTCMonth(), 1);
-  } else if (period === 'custom' && startStr && endStr) {
-    const [sy, sm, sd] = startStr.split('-').map(Number);
-    const [ey, em, ed] = endStr.split('-').map(Number);
-    start = istDayStart(sy, sm - 1, sd);
-    end = istDayStart(ey, em - 1, ed + 1);
-  } else {
-    return null;
-  }
-  return { start, end };
 }
 
 // Date condition for DELIVERED orders: matches on the actual completion time (delivered_at),
@@ -424,10 +399,8 @@ class AdminController {
       }
       await order.save();
 
-      // Statuses with no customer notification below still update the open order screen live
-      if (['PENDING', 'ASSIGNED', 'PICKED'].includes(status)) {
-        notificationService.emitOrderStatus(order);
-      }
+      // Every status change updates the customer's open order screen live (with the new status)
+      notificationService.emitOrderStatus(order);
 
       // Notifications based on status
       if (status === 'CONFIRMED') {

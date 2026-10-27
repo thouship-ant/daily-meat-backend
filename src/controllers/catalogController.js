@@ -1,4 +1,5 @@
 const catalogService = require('../services/catalogService');
+const { getUploadedFileUrl } = require('../config/upload');
 
 class CatalogController {
   
@@ -8,7 +9,7 @@ class CatalogController {
       const data = { ...req.body };
       // If a file was uploaded, multer attaches the URL to req.file.path (Cloudinary) or req.file.location (S3)
       if (req.file) {
-        data.image_url = req.file.path || req.file.location;
+        data.image_url = getUploadedFileUrl(req.file);
       }
       
       const category = await catalogService.createCategory(data);
@@ -31,7 +32,7 @@ class CatalogController {
     try {
       const data = { ...req.body };
       if (req.file) {
-        data.image_url = req.file.path || req.file.location;
+        data.image_url = getUploadedFileUrl(req.file);
       }
       const category = await catalogService.updateCategory(req.params.id, data);
       res.status(200).json({ message: 'Category updated', data: category });
@@ -55,7 +56,7 @@ class CatalogController {
     try {
       const data = { ...req.body };
       if (req.file) {
-        data.image_url = req.file.path || req.file.location;
+        data.image_url = getUploadedFileUrl(req.file);
       }
       if (data.is_popular !== undefined) {
         data.is_popular = data.is_popular === 'true' || data.is_popular === true;
@@ -101,7 +102,7 @@ class CatalogController {
     try {
       const data = { ...req.body };
       if (req.file) {
-        data.image_url = req.file.path || req.file.location;
+        data.image_url = getUploadedFileUrl(req.file);
       }
       if (data.is_popular !== undefined) {
         data.is_popular = data.is_popular === 'true' || data.is_popular === true;

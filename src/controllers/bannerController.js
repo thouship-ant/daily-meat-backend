@@ -1,4 +1,5 @@
 const { Banner } = require('../models');
+const { getUploadedFileUrl } = require('../config/upload');
 
 // Public route to get all active banners
 exports.getAllBanners = async (req, res) => {
@@ -34,7 +35,7 @@ exports.createBanner = async (req, res) => {
     let image_url = null;
 
     if (req.file) {
-      image_url = req.file.path || req.file.location;
+      image_url = getUploadedFileUrl(req.file);
     }
 
     if (!image_url) {
@@ -66,7 +67,7 @@ exports.updateBanner = async (req, res) => {
     }
 
     if (req.file) {
-      banner.image_url = req.file.path || req.file.location;
+      banner.image_url = getUploadedFileUrl(req.file);
     }
 
     if (title !== undefined) banner.title = title;

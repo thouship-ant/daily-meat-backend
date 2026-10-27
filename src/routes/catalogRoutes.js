@@ -4,6 +4,7 @@ const catalogController = require('../controllers/catalogController');
 const bannerController = require('../controllers/bannerController');
 const { requireAuth, requireRole } = require('../middleware/authMiddleware');
 const { upload } = require('../config/upload');
+const { getIo } = require('../config/socket');
 
 /**
  * @swagger
@@ -11,6 +12,26 @@ const { upload } = require('../config/upload');
  *   name: Catalog
  *   description: Product Catalog Management
  */
+
+// Catalog reads must always revalidate, and any successful catalog write (price, stock, product,
+// category, banner) tells connected apps to refetch, so customers see changes without placing an order.
+router.use((req, res, next) => {
+  if (req.method === 'GET') {
+    res.set('Cache-Control', 'no-cache');
+  } else {
+    res.on('finish', () => {
+      if (res.statusCode >= 400) return;
+      try {
+        const io = getIo();
+        io.emit('catalogChanged', { path: req.originalUrl, method: req.method });
+        console.log(`[Socket.io] catalogChanged (${req.method} ${req.originalUrl}) sent to ${io.engine.clientsCount} connected client(s)`);
+      } catch (error) {
+        console.error('catalogChanged emit error:', error.message);
+      }
+    });
+  }
+  next();
+});
 
 // ===================== PUBLIC ROUTES =====================
 /**

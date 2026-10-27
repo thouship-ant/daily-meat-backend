@@ -54,7 +54,23 @@ if (storageProvider === 's3') {
 
 const upload = multer({ storage: storage });
 
+/**
+ * Public URL for an uploaded file. multer-s3's `location` is built from the S3 API endpoint, which
+ * for Supabase Storage is not a browsable URL (404). Supabase serves public files from
+ * /storage/v1/object/public/<bucket>/<key>.
+ */
+const getUploadedFileUrl = (file) => {
+  if (!file) return null;
+  if (file.path) return file.path; // Cloudinary
+  if (storageProvider === 's3' && /supabase\.co/.test(process.env.AWS_ENDPOINT || '') && file.key) {
+    const origin = new URL(process.env.AWS_ENDPOINT).origin;
+    return `${origin}/storage/v1/object/public/${encodeURIComponent(file.bucket || process.env.AWS_S3_BUCKET_NAME)}/${file.key.split('/').map(encodeURIComponent).join('/')}`;
+  }
+  return file.location;
+};
+
 module.exports = {
   upload,
+  getUploadedFileUrl,
   cloudinary: storageProvider === 'cloudinary' ? cloudinary : null,
 };

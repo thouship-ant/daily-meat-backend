@@ -1,32 +1,28 @@
 const { Category, Product, ProductVariant, Order, OrderItem } = require('../models');
 const { Op } = require('sequelize');
+const { getISTRange } = require('../utils/istRange');
 
 class AnalysisController {
   // Aggregate sales revenue, cost, profit, and stock health grouped by category
   async getCategoryAnalytics(req, res) {
     try {
       const filter = req.query.filter || 'all';
-      let dateFilter = {};
-      const now = new Date();
-      
-      // Parse temporal filter (today, week, month, or custom start/end range)
-      if (filter === 'today') {
-        const startOfDay = new Date(now.setHours(0, 0, 0, 0));
-        dateFilter = { createdAt: { [Op.gte]: startOfDay } };
-      } else if (filter === 'week') {
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
-        startOfWeek.setHours(0, 0, 0, 0);
-        dateFilter = { createdAt: { [Op.gte]: startOfWeek } };
-      } else if (filter === 'month') {
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        dateFilter = { createdAt: { [Op.gte]: startOfMonth } };
-      } else if (filter === 'custom' && req.query.start_date && req.query.end_date) {
-        const startDate = new Date(req.query.start_date);
-        startDate.setHours(0, 0, 0, 0);
-        const endDate = new Date(req.query.end_date);
-        endDate.setHours(23, 59, 59, 999);
-        dateFilter = { createdAt: { [Op.gte]: startDate, [Op.lte]: endDate } };
+      // Delivered orders count in the period they were DELIVERED (IST), not when they were booked or
+      // scheduled; cancelled orders count by booking time. Legacy delivered orders without
+      // delivered_at fall back to booking time.
+      let orderFilter = { status: { [Op.in]: ['DELIVERED', 'CANCELLED'] } };
+      const range = getISTRange(filter, req.query.start_date, req.query.end_date);
+      if (range) {
+        const inRange = range.end
+          ? { [Op.gte]: range.start, [Op.lt]: range.end }
+          : { [Op.gte]: range.start };
+        orderFilter = {
+          [Op.or]: [
+            { status: 'DELIVERED', delivered_at: inRange },
+            { status: 'DELIVERED', delivered_at: null, createdAt: inRange },
+            { status: 'CANCELLED', createdAt: inRange }
+          ]
+        };
       }
 
       // Step 1: Fetch all categories
@@ -66,7 +62,7 @@ class AnalysisController {
           {
             model: Order,
             as: 'order',
-            where: dateFilter,
+            where: orderFilter,
             attributes: ['id', 'status']
           },
           {
@@ -76,6 +72,11 @@ class AnalysisController {
           }
         ]
       });
+
+      // An order with items in several categories counts once per category above, so also report
+      // overall distinct counts (what the app should show as the grand total, not the sum of categories)
+      const overallDelivered = new Set();
+      const overallCancelled = new Set();
 
       const analyticsMap = {};
       categories.forEach(c => {
@@ -110,9 +111,11 @@ class AnalysisController {
            stat.grossSales += lineTotal;
            stat.netProfit += (lineTotal - lineCost);
            stat._deliveredOrdersSet.add(item.order.id);
+           overallDelivered.add(item.order.id);
         } else if (status === 'CANCELLED') {
            stat.cancelledRevenue += lineTotal;
            stat._cancelledOrdersSet.add(item.order.id);
+           overallCancelled.add(item.order.id);
         }
       });
 
@@ -127,6 +130,8 @@ class AnalysisController {
         totalOrdersCount: stat._deliveredOrdersSet.size,
         cancelledRevenue: stat.cancelledRevenue,
         cancelledOrdersCount: stat._cancelledOrdersSet.size,
+        overallTotalOrdersCount: overallDelivered.size,
+        overallCancelledOrdersCount: overallCancelled.size,
         inStockVariants: stat.inStockVariants,
         totalVariants: stat.totalVariants,
       }));

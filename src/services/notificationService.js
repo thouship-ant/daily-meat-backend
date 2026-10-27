@@ -4,6 +4,16 @@ const { User } = require('../models');
 
 const expo = new Expo();
 
+// High priority makes Android deliver the push (with sound) immediately even when the phone is
+// idle/screen-off (Doze); normal priority gets deferred or arrives silently. An optional channel
+// lets the app route alerts to a high-importance channel with the order alert sound.
+const alertOptions = () => ({
+  sound: 'default',
+  priority: 'high',
+  ttl: 60 * 60,
+  ...(process.env.ANDROID_NOTIFICATION_CHANNEL_ID ? { channelId: process.env.ANDROID_NOTIFICATION_CHANNEL_ID } : {}),
+});
+
 class NotificationService {
   /**
    * Send a push notification and a socket event
@@ -33,7 +43,7 @@ class NotificationService {
           if (Expo.isExpoPushToken(token)) {
             messages.push({
               to: token,
-              sound: 'default',
+              ...alertOptions(),
               title: title,
               body: body,
               data: data,
@@ -94,7 +104,7 @@ class NotificationService {
             if (Expo.isExpoPushToken(token)) {
               messages.push({
                 to: token,
-                sound: 'default',
+                ...alertOptions(),
                 title: title,
                 body: body,
                 data: data,

@@ -6,12 +6,10 @@ let io;
 
 const initSocket = (server) => {
   io = new Server(server, {
+    // Every connection is authenticated with a JWT below, so don't restrict browser origins
+    // (the web builds of the apps are served from other domains/ports).
     cors: {
-      origin: [
-        'https://dailymeatserver.devmetsolutions.com',
-        'http://localhost:5000',
-        'http://localhost:3000',
-      ],
+      origin: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE']
     }
   });
@@ -20,7 +18,11 @@ const initSocket = (server) => {
   // Runs before the 'connection' event for every incoming socket.
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth?.token;
+      const bearer = socket.handshake.headers?.authorization;
+      const token =
+        socket.handshake.auth?.token ||
+        (bearer && bearer.startsWith('Bearer ') ? bearer.split(' ')[1] : null) ||
+        socket.handshake.query?.token;
       if (!token) {
         return next(new Error('Authentication error: No token provided'));
       }

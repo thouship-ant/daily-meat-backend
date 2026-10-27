@@ -338,6 +338,7 @@ class DriverController {
 
       order.status = 'OUT_FOR_DELIVERY';
       await order.save();
+      notificationService.emitOrderStatus(order);
 
       // Notify Customer
       await notificationService.notifyUser({
@@ -392,6 +393,7 @@ class DriverController {
       }
 
       await order.save();
+      notificationService.emitOrderStatus(order);
 
       // Notify Customer
       await notificationService.notifyUser({
@@ -446,6 +448,7 @@ class DriverController {
       order.status = 'FAILED';
       order.failure_reason = reason;
       await order.save();
+      notificationService.emitOrderStatus(order);
 
       // Notify Customer
       await notificationService.notifyUser({
@@ -528,6 +531,8 @@ class DriverController {
         );
 
         for (const order of orders) {
+          notificationService.emitOrderStatus({ id: order.id, user_id: order.user_id, status: 'OUT_FOR_DELIVERY' });
+
           // Notify Customer
           await notificationService.notifyUser({
             userId: order.user_id,
