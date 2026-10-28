@@ -77,6 +77,8 @@ class NotificationService {
       const payload = { data: { orderId: order.id, status: order.status } };
       io.to(`user_${order.user_id}`).emit('orderStatusChanged', payload);
       io.to(`order_${order.id}`).emit('orderStatusChanged', payload);
+      // Keep every admin's order screens and dashboard in sync, whoever changed the status
+      io.to('admin_room').emit('adminOrderStatusChanged', payload);
     } catch (error) {
       console.error('NotificationService.emitOrderStatus error:', error);
     }

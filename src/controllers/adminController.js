@@ -283,14 +283,16 @@ class AdminController {
       // Let each customer's open order screen move to "Assigned to Rider"
       assignable.forEach(o => notificationService.emitOrderStatus({ id: o.id, user_id: o.user_id, status: 'ASSIGNED' }));
 
-      // Notify Driver
-      await notificationService.notifyUser({
-        userId: driver_id,
-        title: 'New Delivery Assigned',
-        body: `You have been assigned to deliver ${assignable.length} new order(s).`,
-        data: { route: 'driver_active_orders' },
-        socketEvent: 'driverAssigned'
-      });
+      // Notify Driver (sound alert via the new-orders channel / in-app alarm), only if something was assigned
+      if (assignable.length > 0) {
+        await notificationService.notifyUser({
+          userId: driver_id,
+          title: 'New Delivery Assigned',
+          body: `You have been assigned to deliver ${assignable.length} new order(s).`,
+          data: { route: 'driver_active_orders', orderIds: assignable.map(o => o.id) },
+          socketEvent: 'driverAssigned'
+        });
+      }
 
       res.status(200).json({ message: 'Orders assigned to driver successfully.' });
     } catch (error) {
@@ -868,7 +870,12 @@ class AdminController {
       const totalDeliveryFees = deliveredOrders.reduce((sum, order) => sum + (parseFloat(order.delivery_charge) || 0), 0);
 
       // 2. Order Counts by Status
-      const totalOrdersCount = await Order.count({ where: baseFilter });
+      // Total uses the same status-aware bucketing as the order lists, so a cancelled order is
+      // counted on the day it was booked, not the day it was scheduled for.
+      const totalFilter = { ...paymentFilter };
+      const totalDate = getStatusAwareDateCondition(filter, Op, req.query.start_date, req.query.end_date);
+      if (totalDate) totalFilter[Op.and] = [totalDate];
+      const totalOrdersCount = await Order.count({ where: totalFilter });
       const pendingOrdersCount = await Order.count({
         where: { status: { [Op.in]: ['PENDING', 'CONFIRMED'] }, ...baseFilter }
       });
