@@ -7,12 +7,22 @@ const expo = new Expo();
 // High priority makes Android deliver the push (with sound) immediately even when the phone is
 // idle/screen-off (Doze); normal priority gets deferred or arrives silently. An optional channel
 // lets the app route alerts to a high-importance channel with the order alert sound.
-const alertOptions = () => ({
-  sound: 'default',
-  priority: 'high',
-  ttl: 60 * 60,
-  ...(process.env.ANDROID_NOTIFICATION_CHANNEL_ID ? { channelId: process.env.ANDROID_NOTIFICATION_CHANNEL_ID } : {}),
-});
+// Events that must ring loudly even when the app is closed: new orders (admins) and driver assignments.
+// They use the app's 'order-alarm' channel, which plays the bundled noti.mp3 as an alarm-type sound.
+const ALARM_EVENTS = ['adminNewOrder', 'admin_slot_alert', 'driverAssigned'];
+const ALARM_CHANNEL_ID = process.env.ANDROID_ALARM_CHANNEL_ID || 'order-alarm';
+
+const alertOptions = (socketEvent) => {
+  if (ALARM_EVENTS.includes(socketEvent)) {
+    return { sound: 'noti.mp3', priority: 'high', ttl: 60 * 60, channelId: ALARM_CHANNEL_ID };
+  }
+  return {
+    sound: 'default',
+    priority: 'high',
+    ttl: 60 * 60,
+    ...(process.env.ANDROID_NOTIFICATION_CHANNEL_ID ? { channelId: process.env.ANDROID_NOTIFICATION_CHANNEL_ID } : {}),
+  };
+};
 
 // Expo rejects a batch whose tokens belong to different Expo projects (PUSH_TOO_MANY_EXPERIENCE_IDS),
 // which would silently drop the push for everyone. On that error, resend one batch per project.
@@ -20,7 +30,12 @@ const sendPushMessages = async (messages) => {
   const chunks = expo.chunkPushNotifications(messages);
   for (const chunk of chunks) {
     try {
-      await expo.sendPushNotificationsAsync(chunk);
+      const tickets = await expo.sendPushNotificationsAsync(chunk);
+      tickets.forEach((t, i) => {
+        if (t.status === 'error') {
+          console.error('Expo push ticket error:', chunk[i].to, t.message, t.details);
+        }
+      });
     } catch (error) {
       const groups = error && error.code === 'PUSH_TOO_MANY_EXPERIENCE_IDS' && error.details
         ? Object.values(error.details)
@@ -70,7 +85,7 @@ class NotificationService {
           if (Expo.isExpoPushToken(token)) {
             messages.push({
               to: token,
-              ...alertOptions(),
+              ...alertOptions(socketEvent),
               title: title,
               body: body,
               data: data,
@@ -124,7 +139,7 @@ class NotificationService {
             if (Expo.isExpoPushToken(token)) {
               messages.push({
                 to: token,
-                ...alertOptions(),
+                ...alertOptions(socketEvent),
                 title: title,
                 body: body,
                 data: data,
