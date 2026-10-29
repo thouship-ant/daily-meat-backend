@@ -124,6 +124,15 @@ exports.placeOrder = async (req, res) => {
 
     const finalTotalAmount = toMoney(orderTotalBeforeDiscount - discountAmount);
 
+    // Large orders must be paid online (Cash on Delivery is capped)
+    const COD_MAX_AMOUNT = 2000;
+    if ((paymentMethod || 'COD') === 'COD' && finalTotalAmount > COD_MAX_AMOUNT) {
+      await transaction.rollback();
+      return res.status(400).json({
+        error: `Cash on Delivery is not available for orders above Rs. ${COD_MAX_AMOUNT}. Please pay online.`,
+      });
+    }
+
     // The pin the customer set on the Add/Update Address screen is the source of truth for the
     // delivery location. Use it over whatever coordinates arrive with the order, and only
     // geocode the typed address when no coordinates exist at all.
