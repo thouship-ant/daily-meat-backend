@@ -5,6 +5,9 @@ const healthController = require('../controllers/healthController');
 // Health Check Route
 router.get('/health', healthController.checkHealth);
 
+// Public: latest store build numbers so the app can prompt for an upgrade
+router.get('/app-version', require('../controllers/appVersionController').getAppVersion);
+
 const authRoutes = require('./authRoutes');
 router.use('/auth', authRoutes);
 

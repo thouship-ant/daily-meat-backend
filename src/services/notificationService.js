@@ -118,6 +118,17 @@ class NotificationService {
   }
 
   /**
+   * Send the same push to a list of Expo tokens (used for broadcasts)
+   */
+  async sendToTokens(tokens, { title, body, data = {} }) {
+    const messages = tokens
+      .filter(t => Expo.isExpoPushToken(t))
+      .map(to => ({ to, ...alertOptions(), title, body, data }));
+    if (messages.length > 0) await sendPushMessages(messages);
+    return messages.length;
+  }
+
+  /**
    * Notify all Admins
    */
   async notifyAdmins({ title, body, data = {}, socketEvent }) {

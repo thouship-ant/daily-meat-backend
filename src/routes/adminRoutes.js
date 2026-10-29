@@ -543,6 +543,7 @@ router.put('/tickets/:id/status', adminController.updateTicketStatus);
  *         description: Push alerts sent
  */
 router.post('/marketing/send', adminController.sendMarketingBroadcast);
+router.post('/app-update/notify', adminController.notifyAppUpdate);
 
 /**
  * @swagger

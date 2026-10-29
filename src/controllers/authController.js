@@ -165,7 +165,7 @@ class AuthController {
   async updatePushToken(req, res) {
     try {
       const userId = req.user.id;
-      const { pushToken } = req.body;
+      const { pushToken, platform, appVersion } = req.body;
       const { User } = require('../models');
       
       if (!pushToken) {
@@ -190,6 +190,17 @@ class AuthController {
           tokens = tokens.slice(tokens.length - 5);
         }
         await User.update({ push_token: tokens.join(',') }, { where: { id: userId } });
+      }
+
+      // Remember which store/app version this device runs, so app-update pushes can be targeted
+      const devicePlatform = ['android', 'ios'].includes(String(platform).toLowerCase()) ? String(platform).toLowerCase() : null;
+      if (devicePlatform) {
+        const devices = {};
+        for (const t of tokens) {
+          if (user.push_devices && user.push_devices[t]) devices[t] = user.push_devices[t];
+        }
+        devices[pushToken] = { platform: devicePlatform, app_version: appVersion ? String(appVersion) : null };
+        await User.update({ push_devices: devices }, { where: { id: userId } });
       }
 
       res.status(200).json({ message: 'Push token updated successfully.' });

@@ -1173,6 +1173,73 @@ class AdminController {
       res.status(500).json({ error: 'Failed to send marketing broadcast.' });
     }
   }
+
+  /**
+   * Tell users a newer app version is in the store (Play Store for Android, App Store for iOS)
+   * POST /admin/app-update/notify
+   * body: { platform: 'android'|'ios'|'all', latestVersion: '1.2.0', title?, body?, dryRun? }
+   * Only devices that reported that platform (and a version older than latestVersion) are notified.
+   */
+  async notifyAppUpdate(req, res) {
+    try {
+      const { platform = 'all', latestVersion, title, body, dryRun } = req.body;
+      if (!latestVersion || !/^\d+(\.\d+)*$/.test(String(latestVersion))) {
+        return res.status(400).json({ error: 'latestVersion is required (e.g. 1.2.0).' });
+      }
+      const platforms = platform === 'all' ? ['android', 'ios'] : [String(platform).toLowerCase()];
+      if (!platforms.every(p => ['android', 'ios'].includes(p))) {
+        return res.status(400).json({ error: "platform must be 'android', 'ios' or 'all'." });
+      }
+
+      const storeUrls = {
+        android: process.env.APP_ANDROID_STORE_URL || 'https://play.google.com/store/apps/details?id=com.dailymeat.app',
+        ios: process.env.APP_IOS_STORE_URL || null,
+      };
+      if (platforms.includes('ios') && !storeUrls.ios) {
+        return res.status(400).json({ error: 'APP_IOS_STORE_URL is not configured on the server.' });
+      }
+
+      // true when version a is older than b
+      const isOlder = (a, b) => {
+        const pa = String(a).split('.').map(Number);
+        const pb = String(b).split('.').map(Number);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+          const x = pa[i] || 0, y = pb[i] || 0;
+          if (x !== y) return x < y;
+        }
+        return false;
+      };
+
+      const users = await User.findAll({
+        where: { is_active: true, push_devices: { [Op.ne]: null } },
+        attributes: ['id', 'push_devices'],
+      });
+
+      const byPlatform = { android: new Set(), ios: new Set() };
+      for (const user of users) {
+        for (const [token, info] of Object.entries(user.push_devices || {})) {
+          if (!info || !platforms.includes(info.platform)) continue;
+          if (info.app_version && !isOlder(info.app_version, latestVersion)) continue; // already up to date
+          byPlatform[info.platform].add(token);
+        }
+      }
+
+      const counts = { android: byPlatform.android.size, ios: byPlatform.ios.size };
+      if (dryRun) return res.status(200).json({ dryRun: true, devices: counts });
+
+      for (const p of platforms) {
+        await notificationService.sendToTokens([...byPlatform[p]], {
+          title: title || 'New update available',
+          body: body || `Daily Meat ${latestVersion} is now available. Update the app for the latest features and fixes.`,
+          data: { type: 'APP_UPDATE', storeUrl: storeUrls[p], latestVersion: String(latestVersion) },
+        });
+      }
+      res.status(200).json({ message: 'App update notification sent.', devices: counts });
+    } catch (error) {
+      console.error('App update notify error:', error);
+      res.status(500).json({ error: 'Failed to send app update notification.' });
+    }
+  }
 }
 
 module.exports = new AdminController();

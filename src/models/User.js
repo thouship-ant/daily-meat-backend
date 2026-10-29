@@ -55,6 +55,11 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  push_devices: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    comment: 'Per push token metadata: { "<token>": { platform: "android"|"ios", app_version: "1.0.0" } }'
+  },
   device_id: {
     type: DataTypes.STRING,
     allowNull: true,
