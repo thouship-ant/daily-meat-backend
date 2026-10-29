@@ -877,7 +877,7 @@ class AdminController {
       if (totalDate) totalFilter[Op.and] = [totalDate];
       const totalOrdersCount = await Order.count({ where: totalFilter });
       const pendingOrdersCount = await Order.count({
-        where: { status: { [Op.in]: ['PENDING', 'CONFIRMED'] }, ...baseFilter }
+        where: { status: 'PENDING', ...baseFilter }
       });
       const activeDeliveriesCount = await Order.count({
         where: { status: { [Op.in]: ['ASSIGNED', 'PICKED', 'OUT_FOR_DELIVERY'] }, ...baseFilter }

@@ -14,6 +14,33 @@ const alertOptions = () => ({
   ...(process.env.ANDROID_NOTIFICATION_CHANNEL_ID ? { channelId: process.env.ANDROID_NOTIFICATION_CHANNEL_ID } : {}),
 });
 
+// Expo rejects a batch whose tokens belong to different Expo projects (PUSH_TOO_MANY_EXPERIENCE_IDS),
+// which would silently drop the push for everyone. On that error, resend one batch per project.
+const sendPushMessages = async (messages) => {
+  const chunks = expo.chunkPushNotifications(messages);
+  for (const chunk of chunks) {
+    try {
+      await expo.sendPushNotificationsAsync(chunk);
+    } catch (error) {
+      const groups = error && error.code === 'PUSH_TOO_MANY_EXPERIENCE_IDS' && error.details
+        ? Object.values(error.details)
+        : null;
+      if (!groups) {
+        console.error('Error sending push notification chunk:', error);
+        continue;
+      }
+      for (const tokens of groups) {
+        const subset = chunk.filter(m => tokens.includes(m.to));
+        try {
+          await expo.sendPushNotificationsAsync(subset);
+        } catch (err) {
+          console.error('Error sending push notification project batch:', err);
+        }
+      }
+    }
+  }
+};
+
 class NotificationService {
   /**
    * Send a push notification and a socket event
@@ -51,16 +78,7 @@ class NotificationService {
           }
         }
 
-        if (messages.length > 0) {
-          const chunks = expo.chunkPushNotifications(messages);
-          for (let chunk of chunks) {
-            try {
-              await expo.sendPushNotificationsAsync(chunk);
-            } catch (error) {
-              console.error('Error sending push notification chunk:', error);
-            }
-          }
-        }
+        if (messages.length > 0) await sendPushMessages(messages);
       }
     } catch (error) {
       console.error('NotificationService.notifyUser error:', error);
@@ -116,16 +134,7 @@ class NotificationService {
         }
       }
 
-      if (messages.length > 0) {
-        const chunks = expo.chunkPushNotifications(messages);
-        for (let chunk of chunks) {
-          try {
-            await expo.sendPushNotificationsAsync(chunk);
-          } catch (error) {
-            console.error('Error sending push notification to admins:', error);
-          }
-        }
-      }
+      if (messages.length > 0) await sendPushMessages(messages);
     } catch (error) {
       console.error('NotificationService.notifyAdmins error:', error);
     }
