@@ -195,12 +195,19 @@ class AuthController {
       // Remember which store/app version this device runs, so app-update pushes can be targeted
       const devicePlatform = ['android', 'ios'].includes(String(platform).toLowerCase()) ? String(platform).toLowerCase() : null;
       if (devicePlatform) {
-        const devices = {};
-        for (const t of tokens) {
-          if (user.push_devices && user.push_devices[t]) devices[t] = user.push_devices[t];
+        try {
+          const withDevices = await User.unscoped().findByPk(userId, { attributes: ['id', 'push_devices'] });
+          const existing = (withDevices && withDevices.push_devices) || {};
+          const devices = {};
+          for (const t of tokens) {
+            if (existing[t]) devices[t] = existing[t];
+          }
+          devices[pushToken] = { platform: devicePlatform, app_version: appVersion ? String(appVersion) : null };
+          await User.update({ push_devices: devices }, { where: { id: userId } });
+        } catch (deviceError) {
+          // Never fail token registration because of this optional metadata (e.g. column not migrated yet)
+          console.error('Could not store push device info:', deviceError.message);
         }
-        devices[pushToken] = { platform: devicePlatform, app_version: appVersion ? String(appVersion) : null };
-        await User.update({ push_devices: devices }, { where: { id: userId } });
       }
 
       res.status(200).json({ message: 'Push token updated successfully.' });

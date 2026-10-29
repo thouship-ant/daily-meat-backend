@@ -83,6 +83,8 @@ const User = sequelize.define('User', {
 }, {
   tableName: 'users',
   timestamps: true,
+  // push_devices is only read where needed, so a database without the column doesn't break every user query
+  defaultScope: { attributes: { exclude: ['push_devices'] } },
   indexes: [
     {
       name: 'users_email_idx',

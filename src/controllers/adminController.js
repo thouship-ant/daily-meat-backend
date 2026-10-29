@@ -1210,7 +1210,7 @@ class AdminController {
         return false;
       };
 
-      const users = await User.findAll({
+      const users = await User.unscoped().findAll({
         where: { is_active: true, push_devices: { [Op.ne]: null } },
         attributes: ['id', 'push_devices'],
       });
