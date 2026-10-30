@@ -14,7 +14,14 @@ const ALARM_CHANNEL_ID = process.env.ANDROID_ALARM_CHANNEL_ID || 'order-alarm';
 
 const alertOptions = (socketEvent) => {
   if (ALARM_EVENTS.includes(socketEvent)) {
-    return { sound: 'noti.mp3', priority: 'high', ttl: 60 * 60, channelId: ALARM_CHANNEL_ID };
+    return {
+      sound: 'noti.mp3',
+      priority: 'high',
+      ttl: 60 * 60,
+      channelId: ALARM_CHANNEL_ID,
+      // iOS: deliver immediately, even through Focus / a locked screen
+      interruptionLevel: 'time-sensitive',
+    };
   }
   return {
     sound: 'default',
