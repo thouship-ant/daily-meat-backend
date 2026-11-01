@@ -604,6 +604,46 @@ class AdminController {
         whereClause[Op.or] = orConditions;
       }
 
+      // Filters: account status, created date range (IST days), and address location / pincode
+      const status = String(req.query.status || '').toLowerCase();
+      if (status === 'active') whereClause.is_active = true;
+      else if (status === 'inactive') whereClause.is_active = false;
+
+      const ymd = /^\d{4}-\d{2}-\d{2}$/;
+      const createdFrom = String(req.query.createdFrom || '');
+      const createdTo = String(req.query.createdTo || '');
+      if (ymd.test(createdFrom) || ymd.test(createdTo)) {
+        whereClause.createdAt = {};
+        // Day boundaries are Indian Standard Time (UTC+5:30)
+        if (ymd.test(createdFrom)) whereClause.createdAt[Op.gte] = new Date(`${createdFrom}T00:00:00+05:30`);
+        if (ymd.test(createdTo)) whereClause.createdAt[Op.lte] = new Date(`${createdTo}T23:59:59.999+05:30`);
+      }
+
+      const location = String(req.query.location || '').trim();
+      // Pincode range (inclusive). Indian pincodes are fixed 6 digits, so string order equals numeric order.
+      let pincodeFrom = /^\d{6}$/.test(String(req.query.pincodeFrom || '').trim()) ? String(req.query.pincodeFrom).trim() : '';
+      let pincodeTo = /^\d{6}$/.test(String(req.query.pincodeTo || '').trim()) ? String(req.query.pincodeTo).trim() : '';
+      if (pincodeFrom && pincodeTo && pincodeFrom > pincodeTo) [pincodeFrom, pincodeTo] = [pincodeTo, pincodeFrom];
+      if (location || pincodeFrom || pincodeTo) {
+        const { Address } = require('../models');
+        const addressWhere = {};
+        if (pincodeFrom || pincodeTo) {
+          addressWhere.pincode = {
+            ...(pincodeFrom ? { [Op.gte]: pincodeFrom } : {}),
+            ...(pincodeTo ? { [Op.lte]: pincodeTo } : {}),
+          };
+        }
+        if (location) {
+          addressWhere[Op.or] = [
+            { street: { [Op.iLike]: `%${location}%` } },
+            { city: { [Op.iLike]: `%${location}%` } },
+          ];
+        }
+        const matches = await Address.findAll({ where: addressWhere, attributes: ['user_id'], group: ['user_id'], raw: true });
+        const ids = matches.map(m => m.user_id);
+        whereClause.id = { [Op.in]: ids.length ? ids : ['00000000-0000-0000-0000-000000000000'] };
+      }
+
       const { count, rows } = await User.findAndCountAll({
         where: whereClause,
         attributes: ['id', 'name', 'phone', 'email', 'is_active', 'createdAt'],
@@ -755,8 +795,33 @@ class AdminController {
         limit: 10 // only recent 10 for display
       });
 
+      // Location shown on the customer page: preferred saved address (Home first, else the oldest),
+      // otherwise where the customer was when they first opened the app
+      let location = null;
+      try {
+        const { Address } = require('../models');
+        const { getLocality, formatLocation } = require('../services/localityService');
+        const addresses = await Address.findAll({ where: { user_id: id }, order: [['createdAt', 'ASC']] });
+        const chosen = addresses.find(a => String(a.title || '').trim().toLowerCase() === 'home') || addresses[0];
+        if (chosen) {
+          const locality = await getLocality(chosen.latitude, chosen.longitude);
+          location = {
+            source: 'address',
+            text: formatLocation({ locality, city: chosen.city, pincode: chosen.pincode }),
+          };
+        } else {
+          const withSignup = await User.unscoped().findByPk(id, { attributes: ['id', 'signup_location'] });
+          if (withSignup && withSignup.signup_location) {
+            location = { source: 'signup', text: withSignup.signup_location };
+          }
+        }
+      } catch (locationError) {
+        console.error('Customer location lookup failed:', locationError.message);
+      }
+
       res.status(200).json({
         customer,
+        location,
         analytics: {
           totalOrders,
           totalRevenue: totalRevenue.toFixed(2)

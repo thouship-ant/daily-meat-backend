@@ -243,6 +243,9 @@ router.get('/me', requireAuth, authController.getMe);
  */
 router.put('/push-token', requireAuth, authController.updatePushToken);
 
+// Customer's approximate area on first app open (shown to admins on Customer Details)
+router.put('/signup-location', requireAuth, authController.updateSignupLocation);
+
 /**
  * @swagger
  * /api/auth/test-notification:

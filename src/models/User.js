@@ -60,6 +60,11 @@ const User = sequelize.define('User', {
     allowNull: true,
     comment: 'Per push token metadata: { "<token>": { platform: "android"|"ios", app_version: "1.0.0" } }'
   },
+  signup_location: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'Approximate area where the customer first opened the app after signing up (e.g. "Crawford, Tamil Nadu")'
+  },
   device_id: {
     type: DataTypes.STRING,
     allowNull: true,
@@ -84,7 +89,7 @@ const User = sequelize.define('User', {
   tableName: 'users',
   timestamps: true,
   // push_devices is only read where needed, so a database without the column doesn't break every user query
-  defaultScope: { attributes: { exclude: ['push_devices'] } },
+  defaultScope: { attributes: { exclude: ['push_devices', 'signup_location'] } },
   indexes: [
     {
       name: 'users_email_idx',

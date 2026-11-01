@@ -162,6 +162,26 @@ class AuthController {
     }
   }
 
+  // Remembers where a customer was when they first opened the app (set once, never overwritten)
+  async updateSignupLocation(req, res) {
+    try {
+      const location = String(req.body?.location || '').trim().slice(0, 255);
+      if (!location) {
+        return res.status(400).json({ error: 'Location is required.' });
+      }
+      const { User } = require('../models');
+      const user = await User.unscoped().findByPk(req.user.id, { attributes: ['id', 'role', 'signup_location'] });
+      if (user && user.role === 'CUSTOMER' && !user.signup_location) {
+        await User.update({ signup_location: location }, { where: { id: user.id } });
+      }
+      res.status(200).json({ message: 'OK' });
+    } catch (error) {
+      // Optional metadata (e.g. column not migrated yet): never surface as a failure
+      console.error('Update signup location error:', error.message);
+      res.status(200).json({ message: 'OK' });
+    }
+  }
+
   async updatePushToken(req, res) {
     try {
       const userId = req.user.id;
