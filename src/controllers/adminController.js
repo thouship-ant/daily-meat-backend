@@ -644,19 +644,78 @@ class AdminController {
         whereClause.id = { [Op.in]: ids.length ? ids : ['00000000-0000-0000-0000-000000000000'] };
       }
 
-      const { count, rows } = await User.findAndCountAll({
-        where: whereClause,
-        attributes: ['id', 'name', 'phone', 'email', 'is_active', 'createdAt'],
-        order: [['createdAt', 'DESC']],
-        limit,
-        offset
-      });
+      // Grouping: 'date', 'pincode' or 'city', ordered ascending or descending.
+      // Each customer's area comes from their Home address, else their oldest address.
+      const groupBy = ['pincode', 'city'].includes(req.query.groupBy) ? req.query.groupBy : 'date';
+      // Sort direction defaults per split: date descending, pincode ascending, city ascending
+      const defaultDir = groupBy === 'date' ? 'desc' : 'asc';
+      const dir = ['asc', 'desc'].includes(String(req.query.sort).toLowerCase()) ? String(req.query.sort).toLowerCase() : defaultDir;
+      const { Address } = require('../models');
+
+      const attachArea = async (users) => {
+        const ids = users.map(u => u.id);
+        const addresses = ids.length
+          ? await Address.findAll({
+              where: { user_id: { [Op.in]: ids } },
+              attributes: ['user_id', 'title', 'city', 'pincode', 'createdAt'],
+              order: [['createdAt', 'ASC']],
+              raw: true,
+            })
+          : [];
+        const byUser = new Map();
+        for (const addr of addresses) {
+          const list = byUser.get(addr.user_id) || [];
+          list.push(addr);
+          byUser.set(addr.user_id, list);
+        }
+        return users.map((u) => {
+          const list = byUser.get(u.id) || [];
+          const primary = list.find(a => String(a.title || '').trim().toLowerCase() === 'home') || list[0];
+          return {
+            ...u.toJSON(),
+            city: primary ? String(primary.city || '').trim() : '',
+            pincode: primary ? String(primary.pincode || '').trim() : '',
+          };
+        });
+      };
+
+      let data;
+      let total;
+      if (groupBy === 'date') {
+        const { count, rows } = await User.findAndCountAll({
+          where: whereClause,
+          attributes: ['id', 'name', 'phone', 'email', 'is_active', 'createdAt'],
+          order: [['createdAt', dir.toUpperCase()]],
+          limit,
+          offset
+        });
+        total = count;
+        data = await attachArea(rows);
+      } else {
+        // Area isn't a column on users, so sort the whole filtered set, then take the requested page
+        const all = await User.findAll({
+          where: whereClause,
+          attributes: ['id', 'name', 'phone', 'email', 'is_active', 'createdAt'],
+          order: [['createdAt', 'DESC']],
+        });
+        total = all.length;
+        const withArea = await attachArea(all);
+        const key = (c) => String(c[groupBy] || '').toLowerCase();
+        withArea.sort((x, y) => {
+          const kx = key(x);
+          const ky = key(y);
+          if (!kx !== !ky) return kx ? -1 : 1; // customers without an address go last
+          if (kx === ky) return 0; // ties keep newest first (stable sort)
+          return (kx < ky ? -1 : 1) * (dir === 'asc' ? 1 : -1);
+        });
+        data = withArea.slice(offset, offset + limit);
+      }
 
       res.status(200).json({
-        data: rows,
-        total: count,
+        data,
+        total,
         page,
-        totalPages: Math.ceil(count / limit)
+        totalPages: Math.ceil(total / limit)
       });
     } catch (error) {
       console.error('Get all customers error:', error.message);

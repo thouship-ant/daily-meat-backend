@@ -11,6 +11,11 @@ class AddressService {
   async addAddress(userId, addressData) {
     const { title, street, city, pincode, latitude, longitude } = addressData;
 
+    // Indian pincodes are exactly 6 digits and never start with 0
+    if (!/^[6]\d{5}$/.test(String(pincode ?? '').trim())) {
+      throw new Error('Please enter a valid 6-digit pincode.');
+    }
+
     if (!latitude || !longitude) {
       throw new Error('Latitude and Longitude are required to calculate delivery eligibility.');
     }
@@ -76,6 +81,11 @@ class AddressService {
     }
 
     const { title, street, city, pincode, latitude, longitude } = addressData;
+
+    // Indian pincodes are exactly 6 digits and never start with 0
+    if (!/^[6]\d{5}$/.test(String(pincode ?? '').trim())) {
+      throw new Error('Please enter a valid 6-digit pincode.');
+    }
 
     let isDeliverable = address.is_deliverable;
     let newDistanceKm = null;
