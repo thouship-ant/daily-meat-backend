@@ -272,7 +272,18 @@ class AuthController {
       res.status(200).json({ message: 'OTP verified successfully.', user, tokens });
     } catch (error) {
       console.error('Verify OTP error:', error.message);
-      res.status(400).json({ error: error.message });
+      // The service throws plain Errors for things the user can act on (wrong/expired OTP...). Anything
+      // else (database, code bugs) is hidden from the user and reported to the super admins instead.
+      if (error.constructor === Error) {
+        return res.status(400).json({ error: error.message });
+      }
+      const who = req.body.email || req.body.phone || 'unknown';
+      require('../services/notificationService').notifyAdmins({
+        title: 'Registration error',
+        body: `${who}: ${error.message}`.slice(0, 300),
+        data: { type: 'REGISTRATION_ERROR', identifier: who },
+      });
+      res.status(500).json({ error: 'Something went wrong' });
     }
   }
 

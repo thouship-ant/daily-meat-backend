@@ -342,6 +342,9 @@ exports.cancelOrder = async (req, res) => {
     }
 
     order.status = 'CANCELLED';
+    // Reason chosen/typed by the customer (stored in failure_reason, shared with failed deliveries)
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 250) : '';
+    if (reason) order.failure_reason = reason;
     
     // Automatic Refund for ONLINE PAID orders
     if (order.payment_method === 'ONLINE' && order.payment_status === 'PAID') {
@@ -361,7 +364,7 @@ exports.cancelOrder = async (req, res) => {
     // Notify Admins
     await notificationService.notifyAdmins({
       title: `Order Cancelled`,
-      body: `Order #${order.id} was cancelled by the customer.`,
+      body: `Order #${order.id} was cancelled by the customer.${reason ? ` Reason: ${reason}` : ''}`,
       data: { route: 'admin_order', orderId: order.id },
       socketEvent: 'adminOrderStatusChanged'
     });

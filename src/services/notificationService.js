@@ -1,5 +1,6 @@
 const { Expo } = require('expo-server-sdk');
 const { getIo } = require('../config/socket');
+const { Op } = require('sequelize');
 const { User } = require('../models');
 
 const expo = new Expo();
@@ -31,6 +32,43 @@ const alertOptions = (socketEvent) => {
   };
 };
 
+// A token Expo reports as DeviceNotRegistered will never work again (app reinstalled / token rotated):
+// drop it so it stops cluttering the list; the app uploads its fresh token when it next opens.
+const removePushToken = async (token) => {
+  try {
+    const users = await User.findAll({ where: { push_token: { [Op.like]: `%${token}%` } } });
+    for (const u of users) {
+      const kept = u.push_token.split(',').map(t => t.trim()).filter(t => t && t !== token);
+      await u.update({ push_token: kept.length ? kept.join(',') : null });
+    }
+  } catch (error) {
+    console.error('Could not remove stale push token:', error.message);
+  }
+};
+
+// A ticket only says Expo accepted the push. Whether FCM actually delivered it shows up in the receipt a
+// little later (bad FCM credentials, unregistered device...), so log those failures instead of losing them.
+const checkReceiptsLater = (tickets, chunk) => {
+  const ids = tickets.filter(t => t.status === 'ok' && t.id).map(t => t.id);
+  if (ids.length === 0) return;
+  const tokenByTicket = {};
+  tickets.forEach((t, i) => { if (t.id) tokenByTicket[t.id] = chunk[i].to; });
+  setTimeout(async () => {
+    try {
+      for (const receiptChunk of expo.chunkPushNotificationReceiptIds(ids)) {
+        const receipts = await expo.getPushNotificationReceiptsAsync(receiptChunk);
+        for (const [id, r] of Object.entries(receipts)) {
+          if (r.status !== 'error') continue;
+          console.error('Expo push receipt error:', tokenByTicket[id], r.message, r.details);
+          if (r.details && r.details.error === 'DeviceNotRegistered') removePushToken(tokenByTicket[id]);
+        }
+      }
+    } catch (error) {
+      console.error('Could not fetch push receipts:', error.message);
+    }
+  }, 60 * 1000);
+};
+
 // Expo rejects a batch whose tokens belong to different Expo projects (PUSH_TOO_MANY_EXPERIENCE_IDS),
 // which would silently drop the push for everyone. On that error, resend one batch per project.
 const sendPushMessages = async (messages) => {
@@ -38,9 +76,11 @@ const sendPushMessages = async (messages) => {
   for (const chunk of chunks) {
     try {
       const tickets = await expo.sendPushNotificationsAsync(chunk);
+      checkReceiptsLater(tickets, chunk);
       tickets.forEach((t, i) => {
         if (t.status === 'error') {
           console.error('Expo push ticket error:', chunk[i].to, t.message, t.details);
+          if (t.details && t.details.error === 'DeviceNotRegistered') removePushToken(chunk[i].to);
         }
       });
     } catch (error) {
@@ -141,9 +181,13 @@ class NotificationService {
   async notifyAdmins({ title, body, data = {}, socketEvent }) {
     try {
       // 1. Emit socket event if active
+      // (a socket problem must never stop the push below, which is what reaches a closed/locked phone)
       if (socketEvent) {
-        const io = getIo();
-        io.to('admin_room').emit(socketEvent, { title, body, data });
+        try {
+          getIo().to('admin_room').emit(socketEvent, { title, body, data });
+        } catch (socketError) {
+          console.error('notifyAdmins socket emit failed:', socketError.message);
+        }
       }
 
       // 2. Send Push Notification
