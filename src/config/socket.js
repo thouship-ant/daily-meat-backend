@@ -61,12 +61,16 @@ const initSocket = (server) => {
     socket.on('subscribeToOrder', (orderId) => {
       socket.join(`order_${orderId}`);
       console.log(`[Socket.io] ${socket.id} subscribed to order_${orderId}`);
+      // Send the rider's last known position straight away
+      const last = require('../services/driverLocationStore').recall(orderId);
+      if (last) socket.emit('orderLocationUpdate', last);
     });
 
     // Driver emits location update (only DRIVER role should do this)
     socket.on('driverLocationUpdate', (data) => {
       if (role !== 'DRIVER') return; // Ignore if not a driver
       const { orderId, latitude, longitude, speed, heading } = data;
+      require('../services/driverLocationStore').remember(orderId, { latitude, longitude, speed, heading });
       // Broadcast to all clients in the order's room (except the driver)
       socket.to(`order_${orderId}`).emit('orderLocationUpdate', {
         latitude,

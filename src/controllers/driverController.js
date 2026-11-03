@@ -577,6 +577,8 @@ class DriverController {
       }
 
       const io = getIo();
+      const { remember } = require('../services/driverLocationStore');
+      orderIds.forEach(orderId => remember(orderId, { latitude, longitude, speed, heading }));
       if (io) {
         orderIds.forEach(orderId => {
           io.to(`order_${orderId}`).emit('orderLocationUpdate', {
