@@ -628,6 +628,9 @@ class AdminController {
       let pincodeFrom = /^\d{6}$/.test(String(req.query.pincodeFrom || '').trim()) ? String(req.query.pincodeFrom).trim() : '';
       let pincodeTo = /^\d{6}$/.test(String(req.query.pincodeTo || '').trim()) ? String(req.query.pincodeTo).trim() : '';
       if (pincodeFrom && pincodeTo && pincodeFrom > pincodeTo) [pincodeFrom, pincodeTo] = [pincodeTo, pincodeFrom];
+      // When filtering by address, each customer is shown (and grouped) by the address that matched, not
+      // by another of their addresses that happens to be their Home/oldest one
+      let addressFilter = null;
       if (location || pincodeFrom || pincodeTo) {
         const { Address } = require('../models');
         const addressWhere = {};
@@ -643,6 +646,7 @@ class AdminController {
             { city: { [Op.iLike]: `%${location}%` } },
           ];
         }
+        addressFilter = addressWhere;
         const matches = await Address.findAll({ where: addressWhere, attributes: ['user_id'], group: ['user_id'], raw: true });
         const ids = matches.map(m => m.user_id);
         whereClause.id = { [Op.in]: ids.length ? ids : ['00000000-0000-0000-0000-000000000000'] };
@@ -660,7 +664,7 @@ class AdminController {
         const ids = users.map(u => u.id);
         const addresses = ids.length
           ? await Address.findAll({
-              where: { user_id: { [Op.in]: ids } },
+              where: { user_id: { [Op.in]: ids }, ...(addressFilter || {}) },
               attributes: ['user_id', 'title', 'city', 'pincode', 'createdAt'],
               order: [['createdAt', 'ASC']],
               raw: true,
