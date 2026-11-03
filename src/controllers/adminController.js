@@ -111,6 +111,9 @@ function getStatusAwareDateCondition(period, Op, startStr = null, endStr = null)
   };
 }
 
+// Excludes accounts the customer deleted (anonymized with a del_<timestamp> phone); NULL phones stay included
+const NOT_DELETED_ACCOUNT = { [Op.or]: [{ phone: null }, { phone: { [Op.notLike]: 'del\\_%' } }] };
+
 class AdminController {
   /**
    * Create a new driver account
@@ -587,7 +590,8 @@ class AdminController {
       const search = (req.query.search || req.query.q || '').trim();
       const offset = (page - 1) * limit;
 
-      const whereClause = { role: 'CUSTOMER' };
+      // Deleted accounts are anonymized (phone becomes del_<timestamp>), so hide them from the customer list
+      const whereClause = { role: 'CUSTOMER', [Op.and]: [NOT_DELETED_ACCOUNT] };
 
       if (search) {
         const cleanDigits = search.replace(/\D/g, '');
@@ -681,6 +685,8 @@ class AdminController {
 
       let data;
       let total;
+      // Total customers per section heading across the whole filtered list (not just the loaded page)
+      const groupCounts = {};
       if (groupBy === 'date') {
         const { count, rows } = await User.findAndCountAll({
           where: whereClause,
@@ -691,6 +697,12 @@ class AdminController {
         });
         total = count;
         data = await attachArea(rows);
+        const created = await User.findAll({ where: whereClause, attributes: ['createdAt'], raw: true });
+        for (const c of created) {
+          // Indian Standard Time day, as YYYY-MM-DD
+          const key = new Date(new Date(c.createdAt).getTime() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+          groupCounts[key] = (groupCounts[key] || 0) + 1;
+        }
       } else {
         // Area isn't a column on users, so sort the whole filtered set, then take the requested page
         const all = await User.findAll({
@@ -709,10 +721,15 @@ class AdminController {
           return (kx < ky ? -1 : 1) * (dir === 'asc' ? 1 : -1);
         });
         data = withArea.slice(offset, offset + limit);
+        for (const c of withArea) {
+          const key = c[groupBy] || '';
+          groupCounts[key] = (groupCounts[key] || 0) + 1;
+        }
       }
 
       res.status(200).json({
         data,
+        groupCounts,
         total,
         page,
         totalPages: Math.ceil(total / limit)
@@ -730,7 +747,7 @@ class AdminController {
   async exportCustomers(req, res) {
     try {
       const customers = await User.findAll({
-        where: { role: 'CUSTOMER' },
+        where: { role: 'CUSTOMER', [Op.and]: [NOT_DELETED_ACCOUNT] },
         attributes: ['name', 'phone'],
         order: [['createdAt', 'DESC']]
       });
@@ -1011,7 +1028,7 @@ class AdminController {
       });
 
       // 3. User Counts (All-time, generally not filtered by date on overview)
-      const totalCustomers = await User.count({ where: { role: 'CUSTOMER' } });
+      const totalCustomers = await User.count({ where: { role: 'CUSTOMER', [Op.and]: [NOT_DELETED_ACCOUNT] } });
       const totalDrivers = await User.count({ where: { role: 'DRIVER' } });
 
       // 4. Recent Orders (Top 5, applying date filter if any)
