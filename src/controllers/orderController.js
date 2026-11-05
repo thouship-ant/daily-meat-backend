@@ -273,6 +273,7 @@ exports.getUserOrders = async (req, res) => {
         { 
           model: OrderItem, 
           as: 'items',
+          separate: true,
           include: [{
             model: sequelize.models.Product,
             as: 'product',

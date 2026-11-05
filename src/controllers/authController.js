@@ -185,7 +185,7 @@ class AuthController {
   async updatePushToken(req, res) {
     try {
       const userId = req.user.id;
-      const { pushToken, platform, appVersion } = req.body;
+      const { pushToken, platform, appVersion, previousToken } = req.body;
       const { User } = require('../models');
       
       if (!pushToken) {
@@ -202,13 +202,21 @@ class AuthController {
         tokens = user.push_token.split(',').map(t => t.trim()).filter(Boolean);
       }
 
-      // Add token if not present
-      if (!tokens.includes(pushToken)) {
-        tokens.push(pushToken);
-        // Keep max 5 tokens to prevent VARCHAR(255) overflow
-        if (tokens.length > 5) {
-          tokens = tokens.slice(tokens.length - 5);
-        }
+      // This device's older token is replaced, not kept: two live tokens for one phone means every
+      // notification arrives twice, and stale ones push other devices' tokens out of the list.
+      const before = tokens.join(',');
+      if (previousToken && previousToken !== pushToken) {
+        tokens = tokens.filter(t => t !== previousToken);
+      }
+      // Most recently registered goes last, so devices that are in use are the last to be dropped
+      tokens = tokens.filter(t => t !== pushToken);
+      tokens.push(pushToken);
+      // push_token is a VARCHAR(255) unless it was widened to TEXT (then raise PUSH_TOKEN_MAX_CHARS)
+      const maxChars = Number(process.env.PUSH_TOKEN_MAX_CHARS) || 255;
+      while (tokens.length > 1 && tokens.join(',').length > maxChars) {
+        tokens.shift();
+      }
+      if (tokens.join(',') !== before) {
         await User.update({ push_token: tokens.join(',') }, { where: { id: userId } });
       }
 

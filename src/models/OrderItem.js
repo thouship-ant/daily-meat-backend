@@ -48,6 +48,10 @@ const OrderItem = sequelize.define('OrderItem', {
   },
 }, {
   tableName: 'order_items',
+  indexes: [
+    { name: 'order_items_order_id_idx', fields: ['order_id'] },
+    { name: 'order_items_product_id_idx', fields: ['product_id'] },
+  ],
   timestamps: true,
 });
 

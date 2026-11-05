@@ -116,6 +116,14 @@ const Order = sequelize.define('Order', {
 }, {
   tableName: 'orders',
   timestamps: true,
+  indexes: [
+    { name: 'orders_user_id_idx', fields: ['user_id'] },
+    { name: 'orders_driver_status_idx', fields: ['driver_id', 'status'] },
+    { name: 'orders_status_idx', fields: ['status'] },
+    { name: 'orders_delivery_date_idx', fields: ['delivery_date'] },
+    { name: 'orders_created_at_idx', fields: ['createdAt'] },
+    { name: 'orders_delivered_at_idx', fields: ['delivered_at'] },
+  ],
 });
 
 module.exports = Order;

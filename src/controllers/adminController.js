@@ -359,6 +359,7 @@ class AdminController {
           {
             model: OrderItem,
             as: 'items',
+            separate: true,
             include: [
               { model: Product, as: 'product', attributes: ['name', 'image_url'] },
               { model: ProductVariant, as: 'variant', attributes: ['weight', 'price'] }

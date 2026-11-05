@@ -71,18 +71,22 @@ const checkReceiptsLater = (tickets, chunk) => {
 
 // Expo rejects a batch whose tokens belong to different Expo projects (PUSH_TOO_MANY_EXPERIENCE_IDS),
 // which would silently drop the push for everyone. On that error, resend one batch per project.
+const sendChunk = async (chunk) => {
+  const tickets = await expo.sendPushNotificationsAsync(chunk);
+  checkReceiptsLater(tickets, chunk);
+  tickets.forEach((t, i) => {
+    if (t.status === 'error') {
+      console.error('Expo push ticket error:', chunk[i].to, t.message, t.details);
+      if (t.details && t.details.error === 'DeviceNotRegistered') removePushToken(chunk[i].to);
+    }
+  });
+};
+
 const sendPushMessages = async (messages) => {
   const chunks = expo.chunkPushNotifications(messages);
   for (const chunk of chunks) {
     try {
-      const tickets = await expo.sendPushNotificationsAsync(chunk);
-      checkReceiptsLater(tickets, chunk);
-      tickets.forEach((t, i) => {
-        if (t.status === 'error') {
-          console.error('Expo push ticket error:', chunk[i].to, t.message, t.details);
-          if (t.details && t.details.error === 'DeviceNotRegistered') removePushToken(chunk[i].to);
-        }
-      });
+      await sendChunk(chunk);
     } catch (error) {
       const groups = error && error.code === 'PUSH_TOO_MANY_EXPERIENCE_IDS' && error.details
         ? Object.values(error.details)
@@ -92,9 +96,8 @@ const sendPushMessages = async (messages) => {
         continue;
       }
       for (const tokens of groups) {
-        const subset = chunk.filter(m => tokens.includes(m.to));
         try {
-          await expo.sendPushNotificationsAsync(subset);
+          await sendChunk(chunk.filter(m => tokens.includes(m.to)));
         } catch (err) {
           console.error('Error sending push notification project batch:', err);
         }
@@ -207,12 +210,14 @@ class NotificationService {
       // 2. Send Push Notification
       const admins = await User.findAll({ where: { role: 'ADMIN' } });
       const messages = [];
+      const queued = new Set(); // one push per device even if several admin accounts hold the same token
 
       for (let admin of admins) {
         if (admin.push_token) {
           const tokens = admin.push_token.split(',').map(t => t.trim());
           for (const token of tokens) {
-            if (Expo.isExpoPushToken(token)) {
+            if (Expo.isExpoPushToken(token) && !queued.has(token)) {
+              queued.add(token);
               messages.push({
                 to: token,
                 ...alertOptions(socketEvent),

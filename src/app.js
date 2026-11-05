@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const routes = require('./routes');
 
 const { swaggerUi, swaggerDocs } = require('./config/swagger');
@@ -8,6 +9,8 @@ const app = express();
 
 // Middleware
 app.use(cors());
+// gzip JSON responses: order/catalog lists are large and mobile networks are slow
+app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
