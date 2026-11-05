@@ -377,6 +377,36 @@ class AdminController {
   }
 
   /**
+   * Get one order (same shape as an entry of GET /admin/orders), used to keep an open order screen fresh
+   * GET /admin/orders/:id
+   */
+  async getOrderById(req, res) {
+    try {
+      const { OrderItem, Product, ProductVariant } = require('../models');
+      const order = await Order.findByPk(req.params.id, {
+        include: [
+          { model: User, as: 'user', attributes: ['id', 'name', 'phone'] },
+          { model: User, as: 'driver', attributes: ['id', 'name', 'phone'] },
+          {
+            model: OrderItem,
+            as: 'items',
+            separate: true,
+            include: [
+              { model: Product, as: 'product', attributes: ['name', 'image_url'] },
+              { model: ProductVariant, as: 'variant', attributes: ['weight', 'price'] }
+            ]
+          }
+        ]
+      });
+      if (!order) return res.status(404).json({ error: 'Order not found.' });
+      res.status(200).json(order);
+    } catch (error) {
+      console.error('Get order error:', error.message);
+      res.status(500).json({ error: 'Internal server error while fetching the order.' });
+    }
+  }
+
+  /**
    * Update order status
    * PUT /admin/orders/:id/status
    */

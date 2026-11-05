@@ -293,6 +293,8 @@ router.get('/orders/:id/assignment-suggestions', adminController.getAssignmentSu
  *         description: Driver assigned and notified
  */
 router.put('/orders/assign-driver', adminController.assignDriver);
+// Single order, used to keep an open order screen fresh
+router.get('/orders/:id', adminController.getOrderById);
 
 /**
  * @swagger
