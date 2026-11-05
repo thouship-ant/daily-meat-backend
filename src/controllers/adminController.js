@@ -1,11 +1,15 @@
 const { User, Order, OrderItem, Product, ProductVariant } = require('../models');
-const { Op } = require('sequelize');
+const { Op, literal, fn, col } = require('sequelize');
 const bcrypt = require('bcrypt');
 const { USER_ROLES } = require('../constants/enum');
 const notificationService = require('../services/notificationService');
 const { getIo } = require('../config/socket');
 const { parse } = require('json2csv');
 const { getISTRange } = require('../utils/istRange');
+
+// Sorted customer list per pincode/city grouping, reused for a few seconds while the admin pages through it
+const areaListCache = new Map();
+const AREA_CACHE_MS = 30 * 1000;
 
 // Haversine formula to calculate distance between two coordinates in km
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -692,43 +696,58 @@ class AdminController {
       // Total customers per section heading across the whole filtered list (not just the loaded page)
       const groupCounts = {};
       if (groupBy === 'date') {
-        const { count, rows } = await User.findAndCountAll({
-          where: whereClause,
-          attributes: ['id', 'name', 'phone', 'email', 'is_active', 'createdAt'],
-          order: [['createdAt', dir.toUpperCase()]],
-          limit,
-          offset
-        });
+        // Indian Standard Time day, as YYYY-MM-DD, counted by the database instead of loading every customer
+        const istDay = literal(`to_char("createdAt" + interval '5 hours 30 minutes', 'YYYY-MM-DD')`);
+        const [{ count, rows }, perDay] = await Promise.all([
+          User.findAndCountAll({
+            where: whereClause,
+            attributes: ['id', 'name', 'phone', 'email', 'is_active', 'createdAt'],
+            order: [['createdAt', dir.toUpperCase()]],
+            limit,
+            offset
+          }),
+          User.findAll({
+            where: whereClause,
+            attributes: [[istDay, 'day'], [fn('COUNT', col('id')), 'n']],
+            group: [istDay],
+            raw: true,
+          }),
+        ]);
         total = count;
         data = await attachArea(rows);
-        const created = await User.findAll({ where: whereClause, attributes: ['createdAt'], raw: true });
-        for (const c of created) {
-          // Indian Standard Time day, as YYYY-MM-DD
-          const key = new Date(new Date(c.createdAt).getTime() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
-          groupCounts[key] = (groupCounts[key] || 0) + 1;
-        }
+        for (const row of perDay) groupCounts[row.day] = Number(row.n);
       } else {
-        // Area isn't a column on users, so sort the whole filtered set, then take the requested page
-        const all = await User.findAll({
-          where: whereClause,
-          attributes: ['id', 'name', 'phone', 'email', 'is_active', 'createdAt'],
-          order: [['createdAt', 'DESC']],
-        });
-        total = all.length;
-        const withArea = await attachArea(all);
-        const key = (c) => String(c[groupBy] || '').toLowerCase();
-        withArea.sort((x, y) => {
-          const kx = key(x);
-          const ky = key(y);
-          if (!kx !== !ky) return kx ? -1 : 1; // customers without an address go last
-          if (kx === ky) return 0; // ties keep newest first (stable sort)
-          return (kx < ky ? -1 : 1) * (dir === 'asc' ? 1 : -1);
-        });
-        data = withArea.slice(offset, offset + limit);
-        for (const c of withArea) {
-          const key = c[groupBy] || '';
-          groupCounts[key] = (groupCounts[key] || 0) + 1;
+        // Area isn't a column on users, so sort the whole filtered set, then take the requested page.
+        // That is expensive, so the sorted list is kept for a few seconds and reused while paging.
+        const cacheKeyNoPage = JSON.stringify({ ...req.query, page: undefined, limit: undefined });
+        let entry = areaListCache.get(cacheKeyNoPage);
+        if (!entry || Date.now() - entry.at > AREA_CACHE_MS) {
+          const all = await User.findAll({
+            where: whereClause,
+            attributes: ['id', 'name', 'phone', 'email', 'is_active', 'createdAt'],
+            order: [['createdAt', 'DESC']],
+          });
+          const withArea = await attachArea(all);
+          const key = (c) => String(c[groupBy] || '').toLowerCase();
+          withArea.sort((x, y) => {
+            const kx = key(x);
+            const ky = key(y);
+            if (!kx !== !ky) return kx ? -1 : 1; // customers without an address go last
+            if (kx === ky) return 0; // ties keep newest first (stable sort)
+            return (kx < ky ? -1 : 1) * (dir === 'asc' ? 1 : -1);
+          });
+          const counts = {};
+          for (const c of withArea) {
+            const key = c[groupBy] || '';
+            counts[key] = (counts[key] || 0) + 1;
+          }
+          entry = { at: Date.now(), withArea, counts };
+          areaListCache.set(cacheKeyNoPage, entry);
+          if (areaListCache.size > 20) areaListCache.delete(areaListCache.keys().next().value);
         }
+        total = entry.withArea.length;
+        data = entry.withArea.slice(offset, offset + limit);
+        Object.assign(groupCounts, entry.counts);
       }
 
       res.status(200).json({

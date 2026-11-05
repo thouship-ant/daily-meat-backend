@@ -5,6 +5,7 @@ const sequelize = require('./config/database');
 const { initSocket } = require('./config/socket');
 const { initSlotNotificationCron } = require('./services/slotNotificationCron');
 const { initReengagementCron } = require('./services/reengagementCron');
+const { initPromoReminderCron } = require('./services/promoReminderCron');
 
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
@@ -24,6 +25,7 @@ const startServer = async () => {
     // Initialize Cron Jobs
     initSlotNotificationCron();
     initReengagementCron();
+    initPromoReminderCron();
 
     // Start HTTP server
     server.listen(PORT, () => {

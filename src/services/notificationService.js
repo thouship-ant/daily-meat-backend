@@ -176,6 +176,20 @@ class NotificationService {
   }
 
   /**
+   * Send a different push to each recipient: items are { tokens, title, body, data } (used for reminders)
+   */
+  async sendPersonalised(items) {
+    const messages = [];
+    for (const { tokens, title, body, data = {} } of items) {
+      for (const to of tokens) {
+        if (Expo.isExpoPushToken(to)) messages.push({ to, ...alertOptions(), title, body, data });
+      }
+    }
+    if (messages.length > 0) await sendPushMessages(messages);
+    return messages.length;
+  }
+
+  /**
    * Notify all Admins
    */
   async notifyAdmins({ title, body, data = {}, socketEvent }) {
