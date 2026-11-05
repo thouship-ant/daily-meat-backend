@@ -1,6 +1,6 @@
 # Deploying Daily Meat backend with Docker Compose (production)
 
-Stack on one server: the server's existing **nginx** (HTTPS on 80/443) -> **api** container (Node/Express + socket.io, published only on `127.0.0.1:5100`) -> **PostgreSQL 17** container (internal Docker network only, data in the `pgdata` volume).
+Stack on one server: the server's existing **nginx** (HTTPS on 80/443) -> **api** container (Node/Express + socket.io, published only on `127.0.0.1:$PORT` (`PORT` in `.env`, default 5000; the nginx `proxy_pass` must use the same port)) -> **PostgreSQL 17** container (internal Docker network only, data in the `pgdata` volume).
 
 Files: `docker-compose.prod.yml`, `Dockerfile`, `infra/nginx-daily-meat.conf`, `infra/deploy.sh`, `infra/backup.sh`. Configuration lives in a single `.env` file on the server (never committed).
 
@@ -72,7 +72,7 @@ sudo nginx -t && sudo systemctl reload nginx
 sudo certbot --nginx -d dailymeatserver.devmetsolutions.com
 ```
 
-The config proxies everything to `127.0.0.1:5100` with websocket upgrade (needed by socket.io) and a 20 MB upload limit.
+The config proxies everything to `127.0.0.1:$PORT` (`PORT` in `.env`, default 5000; the nginx `proxy_pass` must use the same port) with websocket upgrade (needed by socket.io) and a 20 MB upload limit.
 
 Check:
 
@@ -131,5 +131,5 @@ $C down                              # stop (data kept)
 
 - **Cron jobs** (reminders, slot alerts, 7 PM / 10 PM tomorrow-plan) run inside the `api` container in IST (`TZ=Asia/Kolkata`). Run only **one** api container, or each reminder is sent twice.
 - **Slow or stuck:** `$C ps` for health, `$C logs --tail 100 api`. For slow queries, run `src/scripts/addPerformanceIndexes.sql` once against the database.
-- **502 from nginx:** the API is not up; check `$C ps`, `$C logs api` and `curl http://127.0.0.1:5100/api/health` on the server.
+- **502 from nginx:** the API is not up; check `$C ps`, `$C logs api` and `curl http://127.0.0.1:5000/api/health` on the server.
 - **HTTPS fails to issue:** the DNS A record must point at this server and port 80 must be reachable; see `sudo certbot certificates` and `/var/log/letsencrypt/`.
