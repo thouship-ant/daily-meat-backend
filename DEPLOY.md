@@ -1,8 +1,8 @@
 # Deploying Daily Meat backend with Docker Compose (production)
 
-Stack on one server: **Caddy** (HTTPS, the only public ports 80/443) -> **api** (Node/Express + socket.io, port 5100 internal) -> **PostgreSQL 17** (internal only, data in the `pgdata` volume).
+Stack on one server: the server's existing **nginx** (HTTPS on 80/443) -> **api** container (Node/Express + socket.io, published only on `127.0.0.1:5100`) -> **PostgreSQL 17** container (internal Docker network only, data in the `pgdata` volume).
 
-Files: `docker-compose.prod.yml`, `Dockerfile`, `infra/Caddyfile`, `infra/deploy.sh`, `infra/backup.sh`. Configuration lives in a single `.env` file on the server (never committed).
+Files: `docker-compose.prod.yml`, `Dockerfile`, `infra/nginx-daily-meat.conf`, `infra/deploy.sh`, `infra/backup.sh`. Configuration lives in a single `.env` file on the server (never committed).
 
 ## 1. Server prerequisites
 
@@ -31,7 +31,7 @@ chmod 600 .env
 
 | Variable | Notes |
 |---|---|
-| `APP_BASE_URL` | Public URL, e.g. `https://dailymeatserver.devmetsolutions.com` (must be `https://` + host, no trailing slash or path); Caddy gets its HTTPS certificate for that host |
+| `APP_BASE_URL` | Public URL, e.g. `https://dailymeatserver.devmetsolutions.com` (must be `https://` + host, no trailing slash or path) |
 | `DATABASE_URL` | The single database setting, see below |
 | `JWT_SECRET`, `REFRESH_TOKEN_SECRET` | Required. `openssl rand -hex 32` |
 | `JWT_EXPIRES_IN`, `REFRESH_TOKEN_EXPIRES_IN` | Optional (default `1h` / `30d`) |
@@ -59,9 +59,20 @@ C="docker compose -f docker-compose.prod.yml --env-file .env"
 $C build
 $C up -d db                          # creates the database
 $C run --rm migrate                  # creates the tables (Sequelize migrations)
-$C up -d                             # starts api + caddy
+$C up -d                             # starts the api
 $C run --rm tools npm run setup:admin   # first admin account
 ```
+
+Then add the nginx site (HTTPS is handled by nginx, not Docker):
+
+```bash
+sudo cp infra/nginx-daily-meat.conf /etc/nginx/sites-available/daily-meat
+sudo ln -s /etc/nginx/sites-available/daily-meat /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d dailymeatserver.devmetsolutions.com
+```
+
+The config proxies everything to `127.0.0.1:5100` with websocket upgrade (needed by socket.io) and a 20 MB upload limit.
 
 Check:
 
@@ -120,4 +131,5 @@ $C down                              # stop (data kept)
 
 - **Cron jobs** (reminders, slot alerts, 7 PM / 10 PM tomorrow-plan) run inside the `api` container in IST (`TZ=Asia/Kolkata`). Run only **one** api container, or each reminder is sent twice.
 - **Slow or stuck:** `$C ps` for health, `$C logs --tail 100 api`. For slow queries, run `src/scripts/addPerformanceIndexes.sql` once against the database.
-- **HTTPS fails to issue:** the DNS A record must point at this server and ports 80/443 must be reachable; see `$C logs caddy`.
+- **502 from nginx:** the API is not up; check `$C ps`, `$C logs api` and `curl http://127.0.0.1:5100/api/health` on the server.
+- **HTTPS fails to issue:** the DNS A record must point at this server and port 80 must be reachable; see `sudo certbot certificates` and `/var/log/letsencrypt/`.
