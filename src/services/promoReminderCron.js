@@ -96,7 +96,29 @@ const buildReminders = async () => {
     },
     attributes: ['id', 'name', 'push_token', 'createdAt'],
   });
-  const withTokens = customers.filter((c) => tokensOf(c).length > 0);
+  const withPush = customers.filter((c) => tokensOf(c).length > 0);
+  if (withPush.length === 0) return { reminders: [] };
+
+  // Only customers in a deliverable pincode: at least one saved address must be in the shop's deliverable
+  // list. (An empty list means everywhere is deliverable. Customers with no address yet can't be checked,
+  // so they stay in - their push asks them to add an address.)
+  const deliverable = new Set(((settings && settings.deliverable_pincodes) || []).map((p) => String(p).trim()));
+  const allAddresses = await Address.findAll({
+    where: { user_id: { [Op.in]: withPush.map((c) => c.id) } },
+    attributes: ['user_id', 'pincode', 'createdAt'],
+    order: [['createdAt', 'ASC']],
+    raw: true,
+  });
+  const deliverablePinByUser = new Map(); // first saved address inside the delivery area
+  const hasAddress = new Set();
+  for (const addr of allAddresses) {
+    hasAddress.add(addr.user_id);
+    const pin = String(addr.pincode || '').trim();
+    if ((deliverable.size === 0 || deliverable.has(pin)) && !deliverablePinByUser.has(addr.user_id)) {
+      deliverablePinByUser.set(addr.user_id, pin);
+    }
+  }
+  const withTokens = withPush.filter((c) => !hasAddress.has(c.id) || deliverablePinByUser.has(c.id));
   if (withTokens.length === 0) return { reminders: [] };
 
   // Per customer: how many different days they ordered on, first and last order (IST days)
@@ -179,14 +201,7 @@ const buildReminders = async () => {
 
   if (fresh.length > 0) {
     // Does the new customer already have an address, and where? (pincode -> products ordered around them)
-    const addresses = await Address.findAll({
-      where: { user_id: { [Op.in]: fresh.map((u) => u.id) } },
-      attributes: ['user_id', 'pincode', 'createdAt'],
-      order: [['createdAt', 'ASC']],
-      raw: true,
-    });
-    const pincodeByUser = new Map();
-    for (const addr of addresses) if (!pincodeByUser.has(addr.user_id)) pincodeByUser.set(addr.user_id, String(addr.pincode || '').trim());
+    const pincodeByUser = deliverablePinByUser;
 
     // What other customers order most in each pincode (delivered orders' address snapshot)
     const pincodes = [...new Set([...pincodeByUser.values()].filter(Boolean))];
