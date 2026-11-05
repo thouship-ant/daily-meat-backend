@@ -1,5 +1,6 @@
-# Automatic HTTPS (Let's Encrypt) for $DOMAIN. Everything goes to the API (REST + socket.io websockets).
-{$DOMAIN} {
+# Automatic HTTPS (Let's Encrypt) for the host in APP_BASE_URL (e.g. https://dailymeatserver.devmetsolutions.com).
+# Everything goes to the API (REST + socket.io websockets).
+{$APP_BASE_URL} {
 	encode zstd gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"

@@ -31,7 +31,7 @@ chmod 600 .env
 
 | Variable | Notes |
 |---|---|
-| `DOMAIN` | Public hostname; Caddy gets its HTTPS certificate |
+| `APP_BASE_URL` | Public URL, e.g. `https://dailymeatserver.devmetsolutions.com` (must be `https://` + host, no trailing slash or path); Caddy gets its HTTPS certificate for that host |
 | `DATABASE_URL` | The single database setting, see below |
 | `JWT_SECRET`, `REFRESH_TOKEN_SECRET` | Required. `openssl rand -hex 32` |
 | `JWT_EXPIRES_IN`, `REFRESH_TOKEN_EXPIRES_IN` | Optional (default `1h` / `30d`) |
