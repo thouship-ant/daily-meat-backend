@@ -10,7 +10,16 @@
     "setup:admin": "node src/scripts/setupAdmin.js",
     "logout:admins": "node src/scripts/logoutAdmins.js",
     "test:s3": "node src/scripts/testS3.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "db:up": "docker compose --env-file infra/compose.env up -d",
+    "db:down": "docker compose --env-file infra/compose.env down",
+    "db:reset": "docker compose --env-file infra/compose.env down -v && docker compose --env-file infra/compose.env up -d",
+    "db:migrate": "sequelize-cli db:migrate",
+    "db:migrate:undo": "sequelize-cli db:migrate:undo",
+    "db:migrate:status": "sequelize-cli db:migrate:status",
+    "db:migrate:create": "sequelize-cli migration:generate",
+    "db:export": "sh infra/export-data.sh",
+    "db:import": "sh infra/import-data.sh"
   },
   "keywords": [],
   "author": "",
@@ -42,6 +51,7 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "sequelize-cli": "^6.6.5"
   }
 }

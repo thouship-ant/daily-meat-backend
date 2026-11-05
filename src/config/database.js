@@ -26,6 +26,12 @@ const baseDialectOptions = {
   query_timeout: 30000,
 };
 
+// Supabase needs SSL; the local Docker database (localhost) and the production compose database (host "db") don't.
+// DB_SSL=true/false overrides the guess.
+const isLocalDb = process.env.DB_SSL
+  ? process.env.DB_SSL === 'false'
+  : /@(localhost|127\.0\.0\.1|host\.docker\.internal|db)[:/]/.test(process.env.DATABASE_URL || '');
+
 const sequelize = process.env.DATABASE_URL
   ? new Sequelize(process.env.DATABASE_URL, {
       dialect: 'postgres',
@@ -33,10 +39,7 @@ const sequelize = process.env.DATABASE_URL
       ...poolAndTimeouts,
       dialectOptions: {
         ...baseDialectOptions,
-        ssl: {
-          require: true,
-          rejectUnauthorized: false,
-        },
+        ...(isLocalDb ? {} : { ssl: { require: true, rejectUnauthorized: false } }),
       },
     })
   : new Sequelize(

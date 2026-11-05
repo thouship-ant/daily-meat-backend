@@ -1,0 +1,116 @@
+# Production stack for a single VPS.
+#   docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+# Only Caddy publishes ports (80/443). Postgres and the API are reachable only on the internal network.
+name: daily-meat
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
+      TZ: Asia/Kolkata
+    # The database user, password and name are read from DATABASE_URL, so there is only one place to set them.
+    # The password in the URL is percent-encoded (# = %23, $ = %24, @ = %40, ...); it is decoded here the same way the API decodes it.
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        u="$${DATABASE_URL#*://}"
+        creds="$${u%%@*}"
+        rest="$${u#*@}"
+        export POSTGRES_USER="$${creds%%:*}"
+        pw="$${creds#*:}"
+        bs='\'
+        export POSTGRES_PASSWORD="$$(printf '%b' "$${pw//%/$${bs}x}")"
+        name="$${rest#*/}"
+        export POSTGRES_DB="$${name%%\?*}"
+        exec docker-entrypoint.sh postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d \"$$DATABASE_URL\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # One-off tools (not started by `up`):
+  #   docker compose -f docker-compose.prod.yml --env-file .env run --rm migrate
+  #   docker compose -f docker-compose.prod.yml --env-file .env run --rm tools npm run setup:admin
+  migrate:
+    profiles: ["tools"]
+    build: { context: ., target: tools }
+    command: npx sequelize-cli db:migrate
+    environment: &dburl
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
+      DB_SSL: "false"
+    depends_on:
+      db: { condition: service_healthy }
+
+  tools:
+    profiles: ["tools"]
+    build: { context: ., target: tools }
+    environment: *dburl
+    depends_on:
+      db: { condition: service_healthy }
+
+  api:
+    build: { context: ., target: runtime }
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "5100"
+      <<: *dburl
+      APP_BASE_URL: https://${DOMAIN:?set DOMAIN in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?set REFRESH_TOKEN_SECRET in .env}
+      REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-30d}
+      CASHFREE_ENV: ${CASHFREE_ENV:-PRODUCTION}
+      CASHFREE_APP_ID: ${CASHFREE_APP_ID:-}
+      CASHFREE_SECRET_KEY: ${CASHFREE_SECRET_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMS_FORTIUS_API_KEY: ${SMS_FORTIUS_API_KEY:-}
+      SMS_FORTIUS_SENDER_ID: ${SMS_FORTIUS_SENDER_ID:-}
+      SMS_FORTIUS_TEMPLATE_ID: ${SMS_FORTIUS_TEMPLATE_ID:-}
+      SMS_FORTIUS_BASE_URL: ${SMS_FORTIUS_BASE_URL:-}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-cloudinary}
+      AWS_REGION: ${AWS_REGION:-}
+      AWS_ENDPOINT: ${AWS_ENDPOINT:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+      APP_ANDROID_LATEST_BUILD: ${APP_ANDROID_LATEST_BUILD:-}
+      APP_ANDROID_STORE_URL: ${APP_ANDROID_STORE_URL:-}
+      APP_IOS_LATEST_BUILD: ${APP_IOS_LATEST_BUILD:-}
+      APP_IOS_STORE_URL: ${APP_IOS_STORE_URL:-}
+      PLAY_STORE_URL: ${PLAY_STORE_URL:-}
+      APP_STORE_URL: ${APP_STORE_URL:-}
+    depends_on:
+      db: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

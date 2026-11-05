@@ -414,3 +414,20 @@ If you encounter any architectural questions, credential issues, or edge cases d
 - **Payment Portal:** Cashfree Merchant Dashboard
 - **SMS Console:** SMS Fortius Portal
 - **Developer Documentation:** `http://localhost:5000/api-docs`
+
+## Local database (Docker) and migrations
+
+```bash
+npm run db:up         # start PostgreSQL 17 in Docker as container "daily-meat-db" (localhost:5433, db daily_meat)
+npm run db:migrate    # create the tables (baseline = current production schema, then any newer migrations)
+npm run db:export     # copy schema + all data from Supabase into ./db-export/ (read-only on Supabase)
+npm run db:import     # load ./db-export/data.sql into the local container (replaces local rows, repeatable)
+```
+
+Use the local DB: put `DATABASE_URL=postgres://postgres:postgres@localhost:5433/daily_meat` in `.env` (see `.env.example`).
+The migration CLI and the app read the same `DATABASE_URL`; SSL is only used for non-local hosts.
+
+- New schema change: `npm run db:migrate:create -- --name add-something`, edit the generated file in `migrations/` (`up` and `down`), then `npm run db:migrate`. Undo the last one with `npm run db:migrate:undo`; list them with `npm run db:migrate:status`.
+- On Supabase, run migrations with the session-mode URL (port 5432, not 6543). The baseline does nothing there (tables already exist), it is only recorded.
+- `npm run db:reset` wipes the local database volume and starts an empty one.
+- `db-export/` holds real customer data and is git-ignored. Keep it off servers and chats; delete it when done.

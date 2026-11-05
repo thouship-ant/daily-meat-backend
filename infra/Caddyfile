@@ -1,0 +1,10 @@
+# Automatic HTTPS (Let's Encrypt) for $DOMAIN. Everything goes to the API (REST + socket.io websockets).
+{$DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+	reverse_proxy api:5000
+}
