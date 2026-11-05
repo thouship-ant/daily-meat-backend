@@ -8,7 +8,7 @@ class AnalysisController {
     try {
       const filter = req.query.filter || 'all';
       // Delivered orders count in the period they were DELIVERED (IST), not when they were booked or
-      // scheduled; cancelled orders count by booking time. Legacy delivered orders without
+      // scheduled; cancelled orders count by the time they were cancelled (updatedAt). Legacy delivered orders without
       // delivered_at fall back to booking time.
       let orderFilter = { status: { [Op.in]: ['DELIVERED', 'CANCELLED'] } };
       const range = getISTRange(filter, req.query.start_date, req.query.end_date);
@@ -20,7 +20,7 @@ class AnalysisController {
           [Op.or]: [
             { status: 'DELIVERED', delivered_at: inRange },
             { status: 'DELIVERED', delivered_at: null, createdAt: inRange },
-            { status: 'CANCELLED', createdAt: inRange }
+            { status: 'CANCELLED', updatedAt: inRange }
           ]
         };
       }

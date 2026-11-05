@@ -97,7 +97,8 @@ function getDeliveredDateCondition(period, Op, startStr = null, endStr = null) {
   };
 }
 
-// Date condition for order lists: delivered orders match by delivery time, cancelled by booking time,
+// Date condition for order lists: delivered orders match by delivery time, cancelled by the time they were
+// cancelled (updatedAt: a cancelled order is final, so this is when it was cancelled),
 // everything else by booking/scheduled date. Returns null when the period has no date filter.
 function getStatusAwareDateCondition(period, Op, startStr = null, endStr = null) {
   const range = getISTRange(period, startStr, endStr);
@@ -109,7 +110,7 @@ function getStatusAwareDateCondition(period, Op, startStr = null, endStr = null)
   return {
     [Op.or]: [
       { [Op.and]: [{ status: 'DELIVERED' }, getDeliveredDateCondition(period, Op, startStr, endStr)] },
-      { status: 'CANCELLED', createdAt: created },
+      { status: 'CANCELLED', updatedAt: created },
       { [Op.and]: [{ status: { [Op.notIn]: ['DELIVERED', 'CANCELLED'] } }, getDateCondition(period, Op, startStr, endStr)] }
     ]
   };
