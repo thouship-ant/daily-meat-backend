@@ -26,6 +26,14 @@ const SupportTicket = sequelize.define('SupportTicket', {
   status: {
     type: DataTypes.ENUM('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'),
     defaultValue: 'OPEN'
+  },
+  admin_reply: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  replied_at: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 }, {
   tableName: 'support_tickets',

@@ -281,12 +281,32 @@ class AdminController {
         return res.status(404).json({ error: 'Driver not found or invalid role.' });
       }
 
-      const assignable = await Order.findAll({ where: { id: order_ids, status: 'CONFIRMED' } });
+      // An order that is already ASSIGNED (driver hasn't picked it up yet) can be moved to another driver, but only
+      // when the admin asks for a reassignment; a plain assign never takes orders away from a driver.
+      const { reassign } = req.body;
+      const statuses = reassign ? ['CONFIRMED', 'ASSIGNED'] : ['CONFIRMED'];
+      const assignable = await Order.findAll({ where: { id: order_ids, status: statuses } });
+      // Orders that move from another driver: that driver is told they are no longer theirs
+      const previousDrivers = {};
+      assignable.forEach(o => {
+        if (o.status === 'ASSIGNED' && o.driver_id && String(o.driver_id) !== String(driver_id)) {
+          previousDrivers[o.driver_id] = (previousDrivers[o.driver_id] || 0) + 1;
+        }
+      });
 
       await Order.update(
         { driver_id, status: 'ASSIGNED' },
-        { where: { id: assignable.map(o => o.id), status: 'CONFIRMED' } }
+        { where: { id: assignable.map(o => o.id), status: statuses } }
       );
+
+      for (const [oldDriverId, count] of Object.entries(previousDrivers)) {
+        await notificationService.notifyUser({
+          userId: oldDriverId,
+          title: 'Delivery Reassigned',
+          body: `${count} order(s) were moved to another driver and removed from your route.`,
+          data: { route: 'driver_active_orders' },
+        });
+      }
 
       // Let each customer's open order screen move to "Assigned to Rider"
       assignable.forEach(o => notificationService.emitOrderStatus({ id: o.id, user_id: o.user_id, status: 'ASSIGNED' }));
@@ -1264,6 +1284,7 @@ class AdminController {
       const { SupportTicket } = require('../models');
       const { id } = req.params;
       const { status } = req.body;
+      const reply = typeof req.body.reply === 'string' ? req.body.reply.trim().slice(0, 1000) : '';
 
       if (!status) {
         return res.status(400).json({ error: 'status is required.' });
@@ -1274,7 +1295,26 @@ class AdminController {
         return res.status(404).json({ error: 'Ticket not found.' });
       }
 
-      await ticket.update({ status });
+      // A reply goes with a resolve/close and is shown to the customer on their ticket
+      const update = { status };
+      if (reply && ['RESOLVED', 'CLOSED'].includes(status)) {
+        update.admin_reply = reply;
+        update.replied_at = new Date();
+      }
+      await ticket.update(update);
+
+      if (update.admin_reply) {
+        try {
+          await notificationService.notifyUser({
+            userId: ticket.user_id,
+            title: status === 'RESOLVED' ? 'Your support request is resolved' : 'Your support request is closed',
+            body: reply.slice(0, 180),
+            data: { route: 'customer_help' },
+          });
+        } catch (e) {
+          // The reply is saved; the push is best-effort
+        }
+      }
 
       res.status(200).json({ message: 'Ticket status updated successfully', ticket });
     } catch (error) {
