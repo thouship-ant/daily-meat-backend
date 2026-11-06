@@ -347,11 +347,14 @@ class AdminController {
           { payment_status: 'FAILED' } // Just to be safe, maybe don't filter payment? But keeping it as is. Wait, originally it didn't include FAILED but let's keep original
         ]
       };
-      // Keep original payment logic
+      // Only COD, paid or refunded orders are real orders. The exception is an ONLINE order still waiting for its
+      // payment (status PENDING, payment PENDING): it is listed so the admin can see it and follow up with the
+      // customer. The app shows it under its own "PAYMENT PENDING" pill. Dashboard counts still leave it out.
       whereClause[Op.or] = [
         { payment_method: 'COD' },
         { payment_status: 'PAID' },
-        { payment_status: 'REFUNDED' }
+        { payment_status: 'REFUNDED' },
+        { payment_method: 'ONLINE', payment_status: 'PENDING', status: 'PENDING' }
       ];
 
       // 1. Status Filter
@@ -650,15 +653,20 @@ class AdminController {
       const whereClause = { role: 'CUSTOMER', [Op.and]: [NOT_DELETED_ACCOUNT] };
 
       if (search) {
+        // Only look in the columns that can match what was typed (and use the trigram indexes on them):
+        // numbers/phone-like text -> phone, "@" -> email, anything else -> name (+ email for plain words)
         const cleanDigits = search.replace(/\D/g, '');
-        const orConditions = [
-          { name: { [Op.iLike]: `%${search}%` } },
-          { phone: { [Op.iLike]: `%${search}%` } },
-          { email: { [Op.iLike]: `%${search}%` } }
-        ];
-
-        if (cleanDigits && cleanDigits.length >= 3 && cleanDigits !== search) {
-          orConditions.push({ phone: { [Op.iLike]: `%${cleanDigits}%` } });
+        const phoneLike = /^[\d\s+\-()]+$/.test(search);
+        const orConditions = [];
+        if (phoneLike) {
+          orConditions.push({ phone: { [Op.iLike]: `%${cleanDigits || search}%` } });
+        } else if (search.includes('@')) {
+          orConditions.push({ email: { [Op.iLike]: `%${search}%` } });
+        } else {
+          // Words match the customer's name only. Matching inside e-mail addresses made "amal" find
+          // manishkamalim@... and fathimajamal608@..., so e-mail is searched only when "@" is typed.
+          orConditions.push({ name: { [Op.iLike]: `%${search}%` } });
+          if (cleanDigits.length >= 3) orConditions.push({ phone: { [Op.iLike]: `%${cleanDigits}%` } });
         }
 
         whereClause[Op.or] = orConditions;

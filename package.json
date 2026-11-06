@@ -9,6 +9,7 @@
     "db:sync": "node src/scripts/syncDb.js",
     "setup:admin": "node src/scripts/setupAdmin.js",
     "logout:admins": "node src/scripts/logoutAdmins.js",
+    "notify:addresses": "node src/scripts/notifyIncompleteAddresses.js",
     "test:s3": "node src/scripts/testS3.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "db:up": "docker compose --env-file infra/compose.env up -d",
@@ -19,7 +20,7 @@
     "db:migrate:status": "sequelize-cli db:migrate:status",
     "db:migrate:create": "sequelize-cli migration:generate",
     "db:export": "sh infra/export-data.sh",
-    "db:import": "sh infra/import-data.sh"
+    "db:import": "node infra/import-data.js"
   },
   "keywords": [],
   "author": "",

@@ -371,6 +371,28 @@ The server initializes two background cron jobs in `src/server.js`:
 1. **`slotNotificationCron.js`**: Runs at configured intervals to query upcoming delivery slots and send timely push notifications to customers notifying them that their order preparation has started.
 2. **`reengagementCron.js`**: Queries customers who have not placed an order in the last 7 to 14 days and dispatches automated marketing discount notifications.
 
+### Incomplete-address notification (one-off script)
+
+`npm run notify:addresses` finds saved addresses whose street is not a full address (at least 20 characters with a comma) or whose city is not a Tamil Nadu city or district. It then sends each affected customer one push notification asking them to update the address. The checks are in `src/utils/addressCheck.js`.
+
+Run it from the backend folder, in this order:
+
+```bash
+# 1. Dry run: only lists the customers and addresses that WOULD be notified. Nothing is sent.
+npm run notify:addresses
+
+# 2. Check the list. If it looks right, send to just 3 customers as a trial
+npm run notify:addresses -- --send --limit=3
+
+# 3. Then remove --limit=3 to notify everyone
+npm run notify:addresses -- --send
+```
+
+- The `--` before `--send` is required, so that npm passes the flags to the script.
+- It reads `DATABASE_URL` from `.env`, so run it against the database you mean to notify (production in the Docker deployment: `docker compose -f docker-compose.prod.yml --env-file .env run --rm tools npm run notify:addresses -- --send --limit=3`).
+- The list prints `token:yes` or `token:no` per customer. Customers with `token:no` have no registered device, so they get no push (they still count towards `--limit`).
+- The script does not remember who it already notified. The full run in step 3 starts from the top of the same list, so the 3 trial customers get the message a second time, and running step 3 twice notifies everyone twice. Run each step once.
+
 ---
 
 ## 🛠️ 11. Production Deployment & Maintenance

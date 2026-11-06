@@ -269,4 +269,7 @@ router.put('/orders/:id/fail', driverController.markFailed);
  */
 router.post('/location', driverController.updateLocation);
 
+// Driver taps "I've arrived": sends the customer an arrival notification (once per order)
+router.post('/orders/:id/arrived', driverController.markArrived);
+
 module.exports = router;

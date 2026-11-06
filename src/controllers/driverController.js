@@ -586,10 +586,36 @@ class DriverController {
         });
       }
 
+      // Customer gets "your delivery partner has arrived" when the driver is at the address (never delays the reply)
+      require('../services/arrivalNotifier')
+        .checkArrival(driverId, orderIds, latitude, longitude)
+        .catch((e) => console.error('arrival check error:', e.message));
+
       res.status(200).json({ success: true, message: 'Location updated via API.' });
     } catch (error) {
       console.error('Update driver location error:', error.message);
       res.status(500).json({ error: 'Internal server error while updating location.' });
+    }
+  }
+
+  /**
+   * Driver taps "I've arrived": tells the customer once (also covers orders without saved coordinates)
+   * POST /driver/orders/:id/arrived
+   */
+  async markArrived(req, res) {
+    try {
+      const order = await Order.findOne({
+        where: { id: req.params.id, driver_id: req.user.id, status: 'OUT_FOR_DELIVERY' },
+        attributes: ['id', 'user_id']
+      });
+      if (!order) {
+        return res.status(404).json({ error: 'Order not found or not out for delivery.' });
+      }
+      const sent = await require('../services/arrivalNotifier').notifyArrived(order.id, order.user_id);
+      res.status(200).json({ success: true, notified: sent });
+    } catch (error) {
+      console.error('Mark arrived error:', error.message);
+      res.status(500).json({ error: 'Internal server error while notifying the customer.' });
     }
   }
 }
