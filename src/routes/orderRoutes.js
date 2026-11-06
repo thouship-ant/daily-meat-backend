@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/orderController');
 const { requireAuth } = require('../middleware/authMiddleware');
+const { cacheResponse } = require('../middleware/cache');
 
 /**
  * @swagger
@@ -21,7 +22,7 @@ const { requireAuth } = require('../middleware/authMiddleware');
  *       200:
  *         description: List of active delivery slots
  */
-router.get('/slots', orderController.getActiveDeliverySlots);
+router.get('/slots', cacheResponse({ ns: 'slots', ttl: 300 }), orderController.getActiveDeliverySlots);
 
 /**
  * @swagger

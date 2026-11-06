@@ -33,6 +33,7 @@ chmod 600 .env
 |---|---|
 | `APP_BASE_URL` | Public URL, e.g. `https://dailymeatserver.devmetsolutions.com` (must be `https://` + host, no trailing slash or path) |
 | `DATABASE_URL` | The single database setting, see below |
+| `REDIS_PASSWORD` | Required. Password of the bundled Redis cache; hex only (`openssl rand -hex 24`) |
 | `JWT_SECRET`, `REFRESH_TOKEN_SECRET` | Required. `openssl rand -hex 32` |
 | `JWT_EXPIRES_IN`, `REFRESH_TOKEN_EXPIRES_IN` | Optional (default `1h` / `30d`) |
 | `CASHFREE_*`, `SMS_FORTIUS_*`, `SMTP_*` | Same values as the current production |
@@ -83,6 +84,16 @@ curl https://YOUR_DOMAIN/api/health
 ```
 
 Then point the mobile app's `BASE_URL` (`src/api/apiClient.ts`) at `https://YOUR_DOMAIN/api` and release a build.
+
+## Redis cache
+
+A `redis` container caches the public read endpoints (categories, products, best sellers, variants, banners, shop settings, delivery slots) for 2-5 minutes. Any admin change to those (catalog, banners, shop settings, delivery slots) clears the related cache at once, so customers still see price/stock/pause changes immediately. Responses carry an `X-Cache: HIT|MISS` header. Redis only caches, so it is not backed up and may be wiped any time; if it is down the API silently reads from Postgres.
+
+```bash
+$C exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning info stats | grep keyspace'   # hits / misses
+$C exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning flushall'                     # clear everything
+curl -sI https://YOUR_DOMAIN/api/catalog/categories | grep -i x-cache
+```
 
 ## 4. Moving existing data from Supabase (optional)
 

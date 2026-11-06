@@ -5,6 +5,9 @@ const bannerController = require('../controllers/bannerController');
 const { requireAuth, requireRole } = require('../middleware/authMiddleware');
 const { upload } = require('../config/upload');
 const { getIo } = require('../config/socket');
+const { cacheResponse, invalidateOnWrite } = require('../middleware/cache');
+
+const cached = cacheResponse({ ns: 'catalog', ttl: 300 });
 
 /**
  * @swagger
@@ -33,6 +36,9 @@ router.use((req, res, next) => {
   next();
 });
 
+// Any successful catalog write clears the cached public reads below
+router.use(invalidateOnWrite('catalog'));
+
 // ===================== PUBLIC ROUTES =====================
 /**
  * @swagger
@@ -41,7 +47,7 @@ router.use((req, res, next) => {
  *     summary: Get all categories
  *     tags: [Catalog]
  */
-router.get('/categories', catalogController.getAllCategories);
+router.get('/categories', cached, catalogController.getAllCategories);
 
 /**
  * @swagger
@@ -56,7 +62,7 @@ router.get('/categories', catalogController.getAllCategories);
  *           type: string
  *         description: Filter by category UUID
  */
-router.get('/products', catalogController.getAllProducts);
+router.get('/products', cached, catalogController.getAllProducts);
 
 /**
  * @swagger
@@ -65,7 +71,7 @@ router.get('/products', catalogController.getAllProducts);
  *     summary: Get best selling products
  *     tags: [Catalog]
  */
-router.get('/products/best-sellers', catalogController.getBestSellers);
+router.get('/products/best-sellers', cached, catalogController.getBestSellers);
 
 /**
  * @swagger
@@ -80,7 +86,7 @@ router.get('/products/best-sellers', catalogController.getBestSellers);
  *         schema:
  *           type: string
  */
-router.get('/products/:id', catalogController.getProductById);
+router.get('/products/:id', cached, catalogController.getProductById);
 
 /**
  * @swagger
@@ -98,7 +104,7 @@ router.get('/products/:id', catalogController.getProductById);
  *         schema:
  *           type: integer
  */
-router.get('/variants', catalogController.getAllVariants);
+router.get('/variants', cached, catalogController.getAllVariants);
 
 /**
  * @swagger
@@ -107,7 +113,7 @@ router.get('/variants', catalogController.getAllVariants);
  *     summary: Get all active banners
  *     tags: [Catalog]
  */
-router.get('/banners', bannerController.getAllBanners);
+router.get('/banners', cached, bannerController.getAllBanners);
 
 // ===================== ADMIN ROUTES =====================
 // Apply auth and admin role to all routes below this line

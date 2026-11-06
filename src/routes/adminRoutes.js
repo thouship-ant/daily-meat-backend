@@ -7,6 +7,7 @@ const analysisController = require('../controllers/analysisController');
 const adminCouponController = require('../controllers/adminCouponController');
 const { requireAuth, requireRole } = require('../middleware/authMiddleware');
 const { USER_ROLES } = require('../constants/enum');
+const { invalidateOnWrite } = require('../middleware/cache');
 
 /**
  * @swagger
@@ -18,6 +19,9 @@ const { USER_ROLES } = require('../constants/enum');
 // All routes require ADMIN role
 router.use(requireAuth);
 router.use(requireRole([USER_ROLES.ADMIN || 'ADMIN']));
+
+// Delivery slot changes clear the cached public slot list
+router.use('/slots', invalidateOnWrite('slots'));
 
 /**
  * @swagger

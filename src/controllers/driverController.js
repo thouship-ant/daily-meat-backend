@@ -22,11 +22,15 @@ async function withNavigation(order) {
     if (savedAddress && savedAddress.latitude && savedAddress.longitude) {
       pin = { latitude: savedAddress.latitude, longitude: savedAddress.longitude };
     } else if (!order.address_latitude || !order.address_longitude) {
-      pin = await geocodeAddress({
-        street: order.address_street,
-        city: order.address_city,
-        pincode: order.address_pincode
-      });
+      // Geocoding is an outside service (can be slow, and is rate limited): give it 3s, then answer without a pin
+      pin = await Promise.race([
+        geocodeAddress({
+          street: order.address_street,
+          city: order.address_city,
+          pincode: order.address_pincode
+        }),
+        new Promise((resolve) => setTimeout(() => resolve(null), 3000))
+      ]);
     }
 
     if (pin) {
@@ -94,8 +98,8 @@ class DriverController {
         order: [['createdAt', 'ASC']]
       });
 
-      const result = [];
-      for (const order of activeOrders) result.push(await withNavigation(order));
+      // All orders at once: one after another made a route of 5 stops wait for 5 rounds of database calls
+      const result = await Promise.all(activeOrders.map((order) => withNavigation(order)));
       res.status(200).json(result);
     } catch (error) {
       console.error('Get active orders error:', error.message);
@@ -215,14 +219,22 @@ class DriverController {
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
 
-      // Today's Stats
-      const todayOrders = await Order.findAll({
-        where: {
-          driver_id: driverId,
-          updatedAt: { [Op.gte]: startOfDay }
-        },
-        attributes: ['status']
-      });
+      // Weekly graph window: the start of the day 6 days ago until now
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - 6);
+      weekStart.setHours(0, 0, 0, 0);
+
+      // Two queries at the same time (it used to be nine, one after another, each a trip to the database)
+      const [todayOrders, deliveredThisWeek] = await Promise.all([
+        Order.findAll({
+          where: { driver_id: driverId, updatedAt: { [Op.gte]: startOfDay } },
+          attributes: ['status']
+        }),
+        Order.findAll({
+          where: { driver_id: driverId, status: 'DELIVERED', updatedAt: { [Op.gte]: weekStart } },
+          attributes: ['updatedAt']
+        })
+      ]);
 
       let assigned = 0;
       let picked = 0;
@@ -236,36 +248,19 @@ class DriverController {
         else if (o.status === 'DELIVERED') completedToday++;
       });
 
-      // Also get all active orders just in case they were assigned before today but are still active
-      const activeOrdersCount = await Order.count({
-        where: {
-          driver_id: driverId,
-          status: ['ASSIGNED', 'PICKED', 'OUT_FOR_DELIVERY']
-        }
+      // Weekly Graph Data (Last 7 days completed), counted from the one result above
+      const dayKey = (date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+      const perDay = {};
+      deliveredThisWeek.forEach(o => {
+        const k = dayKey(new Date(o.updatedAt));
+        perDay[k] = (perDay[k] || 0) + 1;
       });
-      // We can use activeOrdersCount for a more accurate pending view if needed, but today's specific stats are good.
-
-      // Weekly Graph Data (Last 7 days completed)
       const graphData = [];
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        d.setHours(0, 0, 0, 0);
-        
-        const endOfDay = new Date(d);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        const count = await Order.count({
-          where: {
-            driver_id: driverId,
-            status: 'DELIVERED',
-            updatedAt: { [Op.between]: [d, endOfDay] }
-          }
-        });
-
-        // Format day e.g. "Mon", "Tue"
         const dayStr = d.toLocaleDateString('en-US', { weekday: 'short' });
-        graphData.push({ day: dayStr, count });
+        graphData.push({ day: dayStr, count: perDay[dayKey(d)] || 0 });
       }
 
       res.status(200).json({

@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const shopSettingsController = require('../controllers/shopSettingsController');
 const { requireAuth } = require('../middleware/authMiddleware');
+const { cacheResponse, invalidateOnWrite } = require('../middleware/cache');
+
+// Shop settings change rarely; the PUT clears the cache so changes (e.g. pausing orders) show up immediately
+router.use(invalidateOnWrite('settings'));
 
 /**
  * @swagger
@@ -22,7 +26,7 @@ const { requireAuth } = require('../middleware/authMiddleware');
  *       404:
  *         description: Settings not found
  */
-router.get('/', shopSettingsController.getSettings);
+router.get('/', cacheResponse({ ns: 'settings', ttl: 120 }), shopSettingsController.getSettings);
 
 /**
  * @swagger
