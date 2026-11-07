@@ -17,6 +17,7 @@ const ContactMessage = require('./ContactMessage');
 const SellerBill = require('./SellerBill');
 const SellerBillItem = require('./SellerBillItem');
 const Banner = require('./Banner');
+const ScheduledNotification = require('./ScheduledNotification');
 
 // Relationships
 User.hasMany(Address, { foreignKey: 'user_id', as: 'addresses' });
@@ -73,6 +74,7 @@ module.exports = {
   User,
   Address,
   ShopSettings,
+  ScheduledNotification,
   Category,
   Product,
   ProductVariant,

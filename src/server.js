@@ -7,6 +7,7 @@ const { initSlotNotificationCron } = require('./services/slotNotificationCron');
 const { initReengagementCron } = require('./services/reengagementCron');
 const { initPromoReminderCron } = require('./services/promoReminderCron');
 const { initTomorrowPlanCron } = require('./services/tomorrowPlanCron');
+const { initScheduledNotificationCron } = require('./services/scheduledNotificationCron');
 
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
@@ -28,6 +29,7 @@ const startServer = async () => {
     initReengagementCron();
     initPromoReminderCron();
     initTomorrowPlanCron();
+    initScheduledNotificationCron();
 
     // Start HTTP server
     server.listen(PORT, () => {

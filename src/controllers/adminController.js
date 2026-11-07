@@ -119,6 +119,33 @@ function getStatusAwareDateCondition(period, Op, startStr = null, endStr = null)
 // Excludes accounts the customer deleted (anonymized with a del_<timestamp> phone); NULL phones stay included
 const NOT_DELETED_ACCOUNT = { [Op.or]: [{ phone: null }, { phone: { [Op.notLike]: 'del\\_%' } }] };
 
+// ---- scheduled notification plan helpers ----
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const PLAN_FIELDS = ['name', 'title', 'body', 'audience', 'inactive_days', 'start_date', 'end_date', 'window_start', 'window_end', 'is_active'];
+
+function pickScheduledPlan(body) {
+  const out = {};
+  for (const f of PLAN_FIELDS) if (body[f] !== undefined) out[f] = body[f];
+  if (out.audience !== undefined) out.audience = out.audience === 'INACTIVE' ? 'INACTIVE' : 'ALL';
+  return out;
+}
+
+function validateScheduledPlan(p, requireAll) {
+  if (requireAll) {
+    for (const f of ['name', 'title', 'body', 'start_date', 'end_date', 'window_start', 'window_end']) {
+      if (!p[f]) return `${f} is required.`;
+    }
+  }
+  if (p.start_date && !YMD.test(String(p.start_date))) return 'start_date must be YYYY-MM-DD.';
+  if (p.end_date && !YMD.test(String(p.end_date))) return 'end_date must be YYYY-MM-DD.';
+  if (p.start_date && p.end_date && String(p.end_date) < String(p.start_date)) return 'end_date cannot be before start_date.';
+  if (p.window_start && !HHMM.test(String(p.window_start))) return 'window_start must be HH:mm (24-hour, IST).';
+  if (p.window_end && !HHMM.test(String(p.window_end))) return 'window_end must be HH:mm (24-hour, IST).';
+  if (p.window_start && p.window_end && String(p.window_end) <= String(p.window_start)) return 'The end of the time range must be after its start.';
+  return null;
+}
+
 class AdminController {
   /**
    * Create a new driver account
@@ -1387,69 +1414,105 @@ class AdminController {
   async sendMarketingBroadcast(req, res) {
     try {
       const { target, inactiveDays, title, body, data } = req.body;
-      const { User, Order } = require('../models');
 
       if (!title || !body) {
         return res.status(400).json({ error: 'title and body are required.' });
       }
 
-      let targetUsers = [];
+      const { getAudienceTokens, sendMarketingPush } = require('../services/marketingService');
+      const audience = { target: target === 'INACTIVE' ? 'INACTIVE' : 'ALL', inactiveDays };
 
-      if (target === 'INACTIVE') {
-        const days = parseInt(inactiveDays, 10) || 14;
-        const inactiveDate = new Date();
-        inactiveDate.setDate(inactiveDate.getDate() - days);
-
-        const customers = await User.findAll({ 
-          where: { 
-            role: 'CUSTOMER', 
-            is_active: true,
-            promotional_notifications: { [Op.or]: [true, null] }
-          } 
-        });
-        for (const customer of customers) {
-          const lastOrder = await Order.findOne({ 
-            where: { user_id: customer.id }, 
-            order: [['createdAt', 'DESC']] 
-          });
-          if (!lastOrder || lastOrder.createdAt < inactiveDate) {
-            targetUsers.push(customer);
-          }
-        }
-      } else {
-        targetUsers = await User.findAll({ 
-          where: { 
-            role: 'CUSTOMER', 
-            is_active: true,
-            promotional_notifications: { [Op.or]: [true, null] }
-          } 
-        });
+      // Count the audience first (one query), answer straight away, and send in the background: sending to
+      // every device takes many Expo requests, and the app gave up waiting (and showed an error) before it ended.
+      const { tokens, customers } = await getAudienceTokens(audience);
+      if (tokens.length === 0) {
+        return res.status(200).json({ message: 'No customers with a registered device matched, so nothing was sent.', devices: 0, customers });
       }
 
-      let sentCount = 0;
-      // We will gather all tokens to send them efficiently instead of querying the DB in a loop
-      const { Expo } = require('expo-server-sdk');
-      const expo = new Expo();
-      const seenTokens = new Set();
+      sendMarketingPush({ ...audience, title, body, data })
+        .then((r) => console.log(`Marketing broadcast "${title}" sent to ${r.devices} devices (${r.customers} customers).`))
+        .catch((error) => console.error('Marketing broadcast send error:', error));
 
-      // push_token holds every device of a user, comma separated: check each token on its own
-      // (testing the whole string skipped every user who has more than one device)
-      for (const user of targetUsers) {
-        for (const token of String(user.push_token || '').split(',').map((t) => t.trim())) {
-          if (Expo.isExpoPushToken(token) && !seenTokens.has(token)) seenTokens.add(token);
-        }
-      }
-      sentCount = seenTokens.size;
-
-      if (sentCount > 0) {
-        // notificationService sends in chunks, logs ticket / receipt errors and drops dead tokens
-        await require('../services/notificationService').sendToTokens([...seenTokens], { title, body, data: data || {} });
-      }
-
-      res.status(200).json({ message: `Marketing broadcast sent to ${sentCount} devices.` });
+      res.status(200).json({
+        message: `Broadcast is being sent to ${tokens.length} devices of ${customers} customers.`,
+        devices: tokens.length,
+        customers,
+      });
     } catch (error) {
       console.error('Marketing broadcast error:', error);
       res.status(500).json({ error: 'Failed to send marketing broadcast.' });
+    }
+  }
+
+  // ----- Scheduled notification plans (pre-defined message + dates + IST time range) -----
+
+  async listScheduledNotifications(req, res) {
+    try {
+      const { ScheduledNotification } = require('../models');
+      const plans = await ScheduledNotification.findAll({ order: [['start_date', 'DESC'], ['id', 'ASC']] });
+      res.status(200).json({ data: plans });
+    } catch (error) {
+      console.error('List scheduled notifications error:', error.message);
+      res.status(500).json({ error: 'Failed to load scheduled notifications.' });
+    }
+  }
+
+  async createScheduledNotification(req, res) {
+    try {
+      const { ScheduledNotification } = require('../models');
+      const err = validateScheduledPlan(req.body, true);
+      if (err) return res.status(400).json({ error: err });
+      const plan = await ScheduledNotification.create(pickScheduledPlan(req.body));
+      res.status(201).json({ data: plan });
+    } catch (error) {
+      console.error('Create scheduled notification error:', error.message);
+      res.status(500).json({ error: 'Failed to create the scheduled notification.' });
+    }
+  }
+
+  async updateScheduledNotification(req, res) {
+    try {
+      const { ScheduledNotification } = require('../models');
+      const plan = await ScheduledNotification.findByPk(req.params.id);
+      if (!plan) return res.status(404).json({ error: 'Scheduled notification not found.' });
+      const err = validateScheduledPlan({ ...plan.toJSON(), ...req.body }, false);
+      if (err) return res.status(400).json({ error: err });
+      const patch = pickScheduledPlan(req.body);
+      // moving the dates or time range makes the plan eligible again today
+      if (['start_date', 'end_date', 'window_start', 'window_end', 'title', 'body'].some((k) => patch[k] !== undefined)) {
+        patch.last_sent_on = null;
+      }
+      await plan.update(patch);
+      res.status(200).json({ data: plan });
+    } catch (error) {
+      console.error('Update scheduled notification error:', error.message);
+      res.status(500).json({ error: 'Failed to update the scheduled notification.' });
+    }
+  }
+
+  async deleteScheduledNotification(req, res) {
+    try {
+      const { ScheduledNotification } = require('../models');
+      const deleted = await ScheduledNotification.destroy({ where: { id: req.params.id } });
+      if (!deleted) return res.status(404).json({ error: 'Scheduled notification not found.' });
+      res.status(200).json({ message: 'Deleted.' });
+    } catch (error) {
+      console.error('Delete scheduled notification error:', error.message);
+      res.status(500).json({ error: 'Failed to delete the scheduled notification.' });
+    }
+  }
+
+  /** Sends the plan's message to the admins' devices only, so it can be previewed before it goes to customers */
+  async testScheduledNotification(req, res) {
+    try {
+      const { ScheduledNotification } = require('../models');
+      const plan = await ScheduledNotification.findByPk(req.params.id);
+      if (!plan) return res.status(404).json({ error: 'Scheduled notification not found.' });
+      const { devices } = await require('../services/marketingService').sendToAdmins({ title: plan.title, body: plan.body });
+      res.status(200).json({ message: devices ? `Test sent to ${devices} admin device(s).` : 'No admin device is registered for push.', devices });
+    } catch (error) {
+      console.error('Test scheduled notification error:', error.message);
+      res.status(500).json({ error: 'Failed to send the test.' });
     }
   }
 

@@ -552,6 +552,13 @@ router.put('/tickets/:id/status', adminController.updateTicketStatus);
  *         description: Push alerts sent
  */
 router.post('/marketing/send', adminController.sendMarketingBroadcast);
+
+// Pre-defined notification plans: message + dates + IST time range (sent automatically by the server)
+router.get('/marketing/scheduled', adminController.listScheduledNotifications);
+router.post('/marketing/scheduled', adminController.createScheduledNotification);
+router.put('/marketing/scheduled/:id', adminController.updateScheduledNotification);
+router.delete('/marketing/scheduled/:id', adminController.deleteScheduledNotification);
+router.post('/marketing/scheduled/:id/test', adminController.testScheduledNotification);
 router.post('/app-update/notify', adminController.notifyAppUpdate);
 
 /**
