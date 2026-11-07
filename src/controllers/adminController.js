@@ -437,6 +437,7 @@ class AdminController {
     try {
       const { id } = req.params;
       const { status } = req.body;
+      const reason = typeof req.body.reason === 'string' ? req.body.reason.trim().slice(0, 250) : '';
 
       if (!status) {
         return res.status(400).json({ error: 'Status is required.' });
@@ -454,6 +455,10 @@ class AdminController {
       }
 
       order.status = status;
+      if (status === 'CANCELLED' && reason) {
+        // Shown to the customer and admins as the cancellation reason (shared with failed deliveries)
+        order.failure_reason = reason;
+      }
       if (status === 'DELIVERED') {
         order.delivered_at = new Date();
       } else if (status === 'PENDING') {
@@ -496,7 +501,7 @@ class AdminController {
         await notificationService.notifyUser({
           userId: order.user_id,
           title: 'Order Cancelled',
-          body: 'Your order has been cancelled by the admin.',
+          body: reason ? `Your order has been cancelled by the store. Reason: ${reason}` : 'Your order has been cancelled by the admin.',
           data: { route: 'order_history', orderId: order.id },
           socketEvent: 'orderStatusChanged'
         });
@@ -506,7 +511,7 @@ class AdminController {
           await notificationService.notifyUser({
             userId: order.driver_id,
             title: 'Order Cancelled',
-            body: `Order #${order.id} has been cancelled and removed from your route.`,
+            body: `Order #${order.id} has been cancelled and removed from your route.${reason ? ` Reason: ${reason}` : ''}`,
             data: { route: 'driver_active_orders', orderId: order.id, status: 'CANCELLED' },
             socketEvent: 'driverOrderStatusChanged'
           });
@@ -1381,34 +1386,20 @@ class AdminController {
       // We will gather all tokens to send them efficiently instead of querying the DB in a loop
       const { Expo } = require('expo-server-sdk');
       const expo = new Expo();
-      const messages = [];
       const seenTokens = new Set();
 
+      // push_token holds every device of a user, comma separated: check each token on its own
+      // (testing the whole string skipped every user who has more than one device)
       for (const user of targetUsers) {
-        if (user.push_token && Expo.isExpoPushToken(user.push_token)) {
-          if (!seenTokens.has(user.push_token)) {
-            seenTokens.add(user.push_token);
-            messages.push({
-              to: user.push_token,
-              sound: 'default',
-              title: title,
-              body: body,
-              data: data || {},
-            });
-            sentCount++;
-          }
+        for (const token of String(user.push_token || '').split(',').map((t) => t.trim())) {
+          if (Expo.isExpoPushToken(token) && !seenTokens.has(token)) seenTokens.add(token);
         }
       }
+      sentCount = seenTokens.size;
 
-      if (messages.length > 0) {
-        const chunks = expo.chunkPushNotifications(messages);
-        for (let chunk of chunks) {
-          try {
-            await expo.sendPushNotificationsAsync(chunk);
-          } catch (error) {
-            console.error('Error sending marketing push notification chunk:', error);
-          }
-        }
+      if (sentCount > 0) {
+        // notificationService sends in chunks, logs ticket / receipt errors and drops dead tokens
+        await require('../services/notificationService').sendToTokens([...seenTokens], { title, body, data: data || {} });
       }
 
       res.status(200).json({ message: `Marketing broadcast sent to ${sentCount} devices.` });
