@@ -375,7 +375,12 @@ class AdminController {
         whereClause[Op.and].push(dateCondition);
       }
 
-      const orders = await Order.findAll({
+      // Optional paging (?limit=50&offset=0): the app loads the first page quickly, then the rest. Without
+      // `limit` every matching order is returned, as before (older app versions).
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 0, 0), 200);
+      const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+      const queryOptions = {
         where: whereClause,
         include: [
           { model: User, as: 'user', attributes: ['id', 'name', 'phone'] },
@@ -390,8 +395,22 @@ class AdminController {
             ]
           }
         ],
-        order: [['createdAt', 'DESC']]
-      });
+        // id breaks ties so pages never overlap or skip rows
+        order: [['createdAt', 'DESC'], ['id', 'DESC']]
+      };
+
+      if (limit > 0) {
+        queryOptions.limit = limit;
+        queryOptions.offset = offset;
+        const [orders, total] = await Promise.all([
+          Order.findAll(queryOptions),
+          Order.count({ where: whereClause })
+        ]);
+        res.set('X-Total-Count', String(total));
+        return res.status(200).json(orders);
+      }
+
+      const orders = await Order.findAll(queryOptions);
       res.status(200).json(orders);
     } catch (error) {
       console.error('Get all orders error:', error.message);
@@ -1115,6 +1134,29 @@ class AdminController {
         where: { status: 'DELIVERED', ...deliveredFilter }
       });
 
+      // Cancelled orders in the selected period (counted on the day they were cancelled, like the order lists)
+      const cancelledWhere = { status: 'CANCELLED', ...paymentFilter };
+      const cancelledRange = getISTRange(filter, req.query.start_date, req.query.end_date);
+      if (cancelledRange) {
+        cancelledWhere[Op.and] = [{
+          updatedAt: cancelledRange.end
+            ? { [Op.gte]: cancelledRange.start, [Op.lt]: cancelledRange.end }
+            : { [Op.gte]: cancelledRange.start }
+        }];
+      }
+      const cancelledOrdersCount = await Order.count({ where: cancelledWhere });
+
+      // Upcoming: scheduled orders (a chosen delivery date) from tomorrow (IST) onwards that are not finished yet.
+      // Not filtered by the period selector: they are by definition in the future.
+      const istTomorrow = new Date(Date.now() + (5.5 + 24) * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const upcomingOrdersCount = await Order.count({
+        where: {
+          ...paymentFilter,
+          status: { [Op.in]: ['PENDING', 'CONFIRMED', 'ASSIGNED', 'PICKED', 'OUT_FOR_DELIVERY'] },
+          delivery_date: { [Op.gte]: istTomorrow }
+        }
+      });
+
       // 3. User Counts (All-time, generally not filtered by date on overview)
       const totalCustomers = await User.count({ where: { role: 'CUSTOMER', [Op.and]: [NOT_DELETED_ACCOUNT] } });
       const totalDrivers = await User.count({ where: { role: 'DRIVER' } });
@@ -1156,7 +1198,9 @@ class AdminController {
           total: totalOrdersCount,
           pending: pendingOrdersCount,
           active: activeDeliveriesCount,
-          completed: completedDeliveriesCount
+          completed: completedDeliveriesCount,
+          cancelled: cancelledOrdersCount,
+          upcoming: upcomingOrdersCount
         },
         users: {
           customers: totalCustomers,

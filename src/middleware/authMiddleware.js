@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
+const userCache = require('../utils/userCache');
 
 const requireAuth = async (req, res, next) => {
   try {
@@ -13,8 +14,18 @@ const requireAuth = async (req, res, next) => {
     // Verify the token using our secret
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Find the user to ensure they still exist and are valid
-    const user = await User.findByPk(decoded.id);
+    // Find the user to ensure they still exist and are valid. Served from a short in-memory cache when possible
+    // (cleared whenever the user is changed), so most requests skip this database round trip.
+    const authStart = Date.now();
+    let user = null;
+    const cached = userCache.get(decoded.id);
+    if (cached) {
+      user = User.build(cached, { isNewRecord: false, raw: true });
+    } else {
+      user = await User.findByPk(decoded.id);
+      if (user) userCache.set(decoded.id, user.get({ plain: true }));
+    }
+    req._authMs = Date.now() - authStart;
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized: User not found' });
     }

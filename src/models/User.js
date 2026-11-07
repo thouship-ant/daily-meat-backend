@@ -106,4 +106,15 @@ const User = sequelize.define('User', {
   ]
 });
 
+// Keep the signed-in-user cache (used by the auth middleware) correct: any change to a user clears its entry
+const userCache = require('../utils/userCache');
+User.addHook('afterSave', (user) => userCache.invalidate(user.id));
+User.addHook('afterDestroy', (user) => userCache.invalidate(user.id));
+User.addHook('afterBulkUpdate', (options) => {
+  const id = options && options.where && options.where.id;
+  if (typeof id === 'string' || typeof id === 'number') userCache.invalidate(id);
+  else userCache.clear();
+});
+User.addHook('afterBulkDestroy', () => userCache.clear());
+
 module.exports = User;

@@ -20,6 +20,9 @@ const { invalidateOnWrite } = require('../middleware/cache');
 router.use(requireAuth);
 router.use(requireRole([USER_ROLES.ADMIN || 'ADMIN']));
 
+// Which endpoints are slow: per-endpoint count / average / p50 / p95 / max since the server started (slowest first)
+router.get('/perf', (req, res) => res.status(200).json(require('../middleware/perf').snapshot()));
+
 // Delivery slot changes clear the cached public slot list
 router.use('/slots', invalidateOnWrite('slots'));
 

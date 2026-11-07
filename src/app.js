@@ -14,15 +14,8 @@ app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Request Logger
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
-  });
-  next();
-});
+// API request timing: logs each request (slow ones flagged) and keeps per-endpoint stats for GET /api/admin/perf
+app.use(require('./middleware/perf').requestTimer);
 
 // Swagger UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
